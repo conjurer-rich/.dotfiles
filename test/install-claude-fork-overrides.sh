@@ -169,6 +169,38 @@ else
   fail "the default CLAUDE.md destination must be preserved"
 fi
 
+# --- 7. EXTRA_SKILLS adds fork-owned names to the manifest -----------------
+new_case extra
+set +e
+EXTRA_SKILLS="rich-one rich-two" \
+  run_installer --skills-only --no-external --no-impeccable >/dev/null
+set -e
+
+if grep -q "rich-one" "$NPX_LOG" && grep -q "rich-two" "$NPX_LOG"; then
+  pass "EXTRA_SKILLS names are passed to the Skills CLI"
+else
+  fail "fork-contributed skill names must reach the Skills CLI"
+fi
+
+if grep -q "tdd" "$NPX_LOG"; then
+  pass "EXTRA_SKILLS adds to rather than replaces the first-party list"
+else
+  fail "the upstream skill list must survive EXTRA_SKILLS"
+fi
+
+# --- 8. A duplicate introduced via EXTRA_SKILLS is still rejected ----------
+new_case extra_dup
+set +e
+OUT8=$(EXTRA_SKILLS="tdd" \
+  run_installer --skills-only --no-external --no-impeccable); STATUS8=$?
+set -e
+
+if [[ $STATUS8 -ne 0 ]] && printf "%s" "$OUT8" | grep -q "Duplicate skill name"; then
+  pass "a duplicate name from EXTRA_SKILLS is rejected"
+else
+  fail "validate_unique_skill_names must still catch duplicates"
+fi
+
 echo ""
 if [[ $FAILURES -gt 0 ]]; then
   echo -e "${RED}$FAILURES test(s) failed${NC}"

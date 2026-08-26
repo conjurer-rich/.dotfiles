@@ -82,6 +82,16 @@ FIRST_PARTY_SKILLS=(
   test-design-reviewer testing twelve-factor typescript-strict
   ubiquitous-language wtf xstate
 )
+
+# Additional first-party skill names contributed by a fork. Environment
+# variables cannot carry bash arrays, so the value is a space-separated string
+# split on read. Names join the reviewed manifest and are still subject to
+# validate_unique_skill_names.
+if [[ -n "${EXTRA_SKILLS:-}" ]]; then
+  read -ra _extra_skills <<< "$EXTRA_SKILLS"
+  FIRST_PARTY_SKILLS+=("${_extra_skills[@]}")
+fi
+
 WEB_QUALITY_SKILLS=(
   accessibility best-practices core-web-vitals performance seo web-quality-audit
 )
