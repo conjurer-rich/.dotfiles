@@ -38,7 +38,7 @@ INSTALL_OPENCODE=false
 INSTALL_EXTERNAL=true
 INSTALL_IMPECCABLE=true
 INSTALL_PONYTAIL=true
-BASE_URL="https://raw.githubusercontent.com/citypaul/.dotfiles"
+BASE_URL="${BASE_URL:-https://raw.githubusercontent.com/citypaul/.dotfiles}"
 SKILLS_CLI_VERSION="1.5.22" # https://github.com/vercel-labs/skills/tree/v1.5.22
 
 # Reviewed immutable source revisions. Every source is pinned to a commit and
@@ -48,7 +48,7 @@ SKILLS_CLI_VERSION="1.5.22" # https://github.com/vercel-labs/skills/tree/v1.5.22
 # fetched locally with a shallow pinned `git fetch` and handed to the CLI as a
 # local path (see fetch_pinned_source). A subpath entry limits the fetch to
 # one directory for repos far larger than their skills.
-OWN_SKILLS_REPO_BASE="citypaul/.dotfiles"
+OWN_SKILLS_REPO_BASE="${OWN_SKILLS_REPO_BASE:-citypaul/.dotfiles}"
 WEB_QUALITY_SKILLS_REPO="addyosmani/web-quality-skills#95d6e255afe1596b557d7a8498517884438f5b3a"
 NEXT_SKILLS_REPO="vercel/next.js#ae1e53a11f5379e715096b829178f4df92d35044"
 NEXT_SKILLS_SUBPATH="skills"
