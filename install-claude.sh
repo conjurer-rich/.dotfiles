@@ -770,7 +770,7 @@ if [[ "$INSTALL_CLAUDE" == true ]]; then
   echo -e "${BLUE}Installing CLAUDE.md...${NC}"
   download_file \
     "$BASE_URL/$VERSION/claude/.claude/CLAUDE.md" \
-    ~/.claude/CLAUDE.md \
+    "${CLAUDE_MD_DEST:-$HOME/.claude/CLAUDE.md}" \
     "CLAUDE.md"
   echo ""
 fi

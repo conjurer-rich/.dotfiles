@@ -138,6 +138,37 @@ else
   fail "the default base URL must be preserved"
 fi
 
+# --- 5. CLAUDE_MD_DEST redirects where CLAUDE.md lands ---------------------
+new_case claudemd
+set +e
+CLAUDE_MD_DEST="$HOME_DIR/.claude/base-CLAUDE.md" \
+  run_installer --claude-only >/dev/null
+set -e
+
+if [[ -f "$HOME_DIR/.claude/base-CLAUDE.md" ]]; then
+  pass "CLAUDE_MD_DEST redirects the CLAUDE.md destination"
+else
+  fail "CLAUDE.md must land at the overridden destination"
+fi
+
+if [[ ! -f "$HOME_DIR/.claude/CLAUDE.md" ]]; then
+  pass "the default CLAUDE.md path is left untouched when redirected"
+else
+  fail "redirecting must not also write the default path"
+fi
+
+# --- 6. CLAUDE.md destination default is unchanged when unset --------------
+new_case claudemd_default
+set +e
+run_installer --claude-only >/dev/null
+set -e
+
+if [[ -f "$HOME_DIR/.claude/CLAUDE.md" ]]; then
+  pass "an unset CLAUDE_MD_DEST still writes ~/.claude/CLAUDE.md"
+else
+  fail "the default CLAUDE.md destination must be preserved"
+fi
+
 echo ""
 if [[ $FAILURES -gt 0 ]]; then
   echo -e "${RED}$FAILURES test(s) failed${NC}"
