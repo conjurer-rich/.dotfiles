@@ -1155,7 +1155,7 @@ Ask yourself:
 
 ## 🤖 Claude Code Agents: Automated Enforcement
 
-[**→ Read the agents documentation**](claude/.claude/agents/README.md)
+[**→ Read the agents documentation**](claude/.claude/agent-notes/README.md)
 
 Nine specialized sub-agents that run in isolated context windows to enforce CLAUDE.md principles and manage development workflow:
 
@@ -1403,7 +1403,7 @@ Claude Code: [Launches use-case-data-patterns agent]
 - Only material correctness, authorization, integrity, concurrency, delivery, recovery, or operability gaps
 
 The current agent is an original rewrite. Its
-[source notes](claude/.claude/agents/references/use-case-data-patterns-source-notes.md)
+[source notes](claude/.claude/agent-notes/use-case-data-patterns-source-notes.md)
 disclose an earlier unlicensed copy and the unresolved published-history issue.
 
 ---
@@ -1874,7 +1874,7 @@ change before release.
 - **[Skills](claude/.claude/skills/)** - Auto-discovered patterns from this repo, 6 from [addyosmani/web-quality-skills](https://github.com/addyosmani/web-quality-skills), 2 from [vercel/next.js](https://github.com/vercel/next.js/tree/canary/skills), 2 from [vercel-labs/agent-skills](https://skills.sh/vercel-labs/agent-skills), 18 from [pbakaus/impeccable](https://github.com/pbakaus/impeccable), optional `grill-me` and `writing-for-agents` from [mattpocock/skills](https://skills.sh/mattpocock/skills), `skill-creator` from [anthropics/skills](https://github.com/anthropics/skills), `seo-audit` from [coreyhaines31/marketingskills](https://skills.sh/coreyhaines31/marketingskills/seo-audit), `herdr` from [herdrdev/herdr](https://skills.sh/herdrdev/herdr), and `skill-doctor` from [warpdotdev/common-skills](https://www.warp.dev/skill-doctor) — all installed via [skills.sh](https://skills.sh) for multi-agent portability.
 - **[Commands](claude/.claude/commands/)** - Slash commands (/setup, /plan, /continue)
 - **[Skill evaluations](evals/skills/README.md)** - promptfoo routing suite that checks each skill fires on the requests it claims and stays quiet on its neighbours'
-- **[Agents README](claude/.claude/agents/README.md)** - Detailed agent documentation with examples
+- **[Agents README](claude/.claude/agent-notes/README.md)** - Detailed agent documentation with examples
 - **[Agent Definitions](claude/.claude/agents/)** - Individual agent configuration files (9 agents: tdd-guardian, ts-enforcer, refactor-scan, docs-guardian, learn, progress-guardian, adr, use-case-data-patterns, twelve-factor-audit)
 
 ---

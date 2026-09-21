@@ -111,7 +111,9 @@ AGENT_FILES=(
   learn.md use-case-data-patterns.md progress-guardian.md
   twelve-factor-audit.md
 )
-CLAUDE_AGENT_FILES=("${AGENT_FILES[@]}" README.md)
+# Reference notes that document the agents. They live outside agents/ because
+# Claude Code loads every .md under agents/ (recursively) as an agent type.
+AGENT_NOTE_FILES=(README.md use-case-data-patterns-source-notes.md)
 
 # Agents to target when installing skills via the pinned Skills CLI.
 # Built up from --agent/--with-opencode flags; default is claude-code only.
@@ -864,11 +866,18 @@ fi
 if [[ "$INSTALL_AGENTS" == true ]]; then
   echo -e "${BLUE}Installing Claude Code agents...${NC}"
 
-  for agent in "${CLAUDE_AGENT_FILES[@]}"; do
+  for agent in "${AGENT_FILES[@]}"; do
     download_file \
       "$BASE_URL/$VERSION/claude/.claude/agents/$agent" \
       ~/.claude/agents/"$agent" \
       "agents/$agent"
+  done
+
+  for note in "${AGENT_NOTE_FILES[@]}"; do
+    download_file \
+      "$BASE_URL/$VERSION/claude/.claude/agent-notes/$note" \
+      ~/.claude/agent-notes/"$note" \
+      "agent-notes/$note"
   done
   echo ""
 fi
@@ -897,7 +906,7 @@ if [[ "$INSTALL_OPENCODE" == true ]]; then
       '/^allowed-tools:/d'
   done
 
-  # Project only real agent files (not README.md) from the pinned source.
+  # Project the agent files from the pinned source (notes live in agent-notes/).
   # OpenCode uses ~/.config/opencode/agent/ (singular) for agents
   # The 'tools' field expects an object in OpenCode but is a string in Claude Code
   # The 'color' field expects hex (#RRGGBB) in OpenCode but is a named color in Claude Code
@@ -955,7 +964,8 @@ if [[ "$INSTALL_COMMANDS" == true ]]; then
 fi
 
 if [[ "$INSTALL_AGENTS" == true ]]; then
-  echo -e "  ${GREEN}✓${NC} agents/ (9 Claude Code agents + README)"
+  echo -e "  ${GREEN}✓${NC} agents/ (9 Claude Code agents)"
+  echo -e "  ${GREEN}✓${NC} agent-notes/ (agent documentation, not loaded as agents)"
 fi
 
 if [[ "$INSTALL_OPENCODE" == true ]]; then
@@ -996,7 +1006,7 @@ fi
 
 if [[ "$INSTALL_AGENTS" == true ]]; then
   echo -e "  Learn about agents:"
-  echo -e "     ${YELLOW}cat ~/.claude/agents/README.md${NC}"
+  echo -e "     ${YELLOW}cat ~/.claude/agent-notes/README.md${NC}"
   echo ""
 fi
 

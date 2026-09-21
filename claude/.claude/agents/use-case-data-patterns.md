@@ -61,4 +61,4 @@ trace may say no material gap was found.
 
 This is an original rewrite. An earlier repository revision copied an
 unlicensed third-party agent; see
-[`references/use-case-data-patterns-source-notes.md`](references/use-case-data-patterns-source-notes.md).
+[`agent-notes/use-case-data-patterns-source-notes.md`](../agent-notes/use-case-data-patterns-source-notes.md).

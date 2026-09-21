@@ -164,7 +164,7 @@ actor's trigger through policy, domain logic, data access, effects, and the
 observable result, then identify only material gaps.
 
 The current agent is an original rewrite. Its
-[source notes](references/use-case-data-patterns-source-notes.md) disclose an
+[source notes](use-case-data-patterns-source-notes.md) disclose an
 earlier unlicensed copy and the unresolved published-history permission issue.
 
 ---
