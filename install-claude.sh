@@ -72,7 +72,8 @@ ANTHROPIC_SKILLS_SUBPATH="skills"
 FIRST_PARTY_SKILLS=(
   acceptance-review api-design bff-design bff-entry-points
   characterisation-tests ci-debugging cli-design codebase-design debugging
-  diagrams domain-driven-design double-check evaluate-existing-solutions
+  diagrams domain-driven-design double-check engineering-practice
+  evaluate-existing-solutions
   event-sourcing expectations find-gaps find-skills finding-seams
   folder-structure front-end-testing functional graph-engineering
   hexagonal-architecture
