@@ -114,13 +114,13 @@ One pass over every open delegated PR, built to run under `/loop`. Watch holds n
 2. `gh pr list --state open --limit 100 --json number,isDraft,headRefName,headRefOid,createdAt --jq '[.[] | select(.headRefName | startswith("<branch_prefix>"))]'`.
 3. Classify each PR:
    - **Needs review**: at least one review thread, top-level comment or review body needs an answer (see **Delegator marker**), and the PR is a draft or `land` is off.
-   - **Ready**: `land` is on and, from this query, `isDraft` is false and `ready.totalCount` is above 0:
+   - **Ready**: `land` is on and, from this query, `isDraft` is false and `ready.filteredCount` is above 0:
 
      ```bash
      gh api graphql -F owner=<owner> -F repo=<repo> -F pr=<PR> -f query='
      query($owner:String!,$repo:String!,$pr:Int!){
        repository(owner:$owner,name:$repo){ pullRequest(number:$pr){ isDraft headRefOid
-         ready: timelineItems(itemTypes:[READY_FOR_REVIEW_EVENT]){ totalCount }
+         ready: timelineItems(itemTypes:[READY_FOR_REVIEW_EVENT]){ filteredCount }
          latest: timelineItems(itemTypes:[READY_FOR_REVIEW_EVENT, PULL_REQUEST_COMMIT], last:1){ nodes{ __typename } } } } }'
      ```
 
