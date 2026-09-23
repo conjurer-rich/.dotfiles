@@ -5,7 +5,7 @@ description: Take a triaged GitHub issue end-to-end to a reviewable pull request
 
 # Delegating GitHub issues
 
-You are the delegator. You do not write production code. You check eligibility and budget, create the worktree, hand implementation to a subagent, verify the result, open the PR, and stop. A human reviews and merges.
+You are the delegator. You do not write production code. You check eligibility and budget, create the worktree, hand implementation to a subagent, verify the result, open the PR, and stop. A human reviews. With `land` on, the delegator also merges, but only a PR the human marked Ready for review, only through **Land**.
 
 ## Parameters
 
@@ -21,6 +21,20 @@ The calling command supplies these; defaults apply when it does not.
 | `pre_pr_gate` | the project's `/pr` command | The gate the implementer must pass before the PR opens |
 | `walkthrough` | off | When on, run the `browser-ux-walkthrough` skill for diffs that touch the UI path the project names |
 | `oracle` | off | When on, apply the Preview oracle rule below |
+| `land` | off | When on, Work opens PRs as drafts, and **Land** may merge a PR the human marked Ready for review |
+
+## Delegator marker
+
+The delegator posts through the human's `gh` auth, so a comment's author cannot tell the two apart. Every comment and thread reply the delegator posts therefore ends with this line:
+
+    <!-- delegator -->
+
+A comment **needs an answer** when all four hold:
+
+- it does not contain `<!-- delegator`;
+- its author login does not end in `[bot]`;
+- it does not contain `<!-- preview-`;
+- no comment containing `<!-- delegator` follows it: in the same review thread for an inline comment, or on the PR conversation for a top-level comment.
 
 ## Entry points
 
@@ -59,7 +73,7 @@ The calling command supplies these; defaults apply when it does not.
 8. **Walkthrough.** If `walkthrough` is on and `git diff --cached --name-only` contains a path under the project's UI root, load `browser-ux-walkthrough` with the project's stack skill. It returns the `## UX walkthrough` section text and a list of screenshot files. If it reports the stack could not boot, file a `follow-up` issue titled `Walkthrough blocked for #N: <reason>` and use `Walkthrough blocked: <reason> (see #<follow-up>)` as the section body.
 9. **Commit.** Ask the human for commit approval with the proposed message shown. On approval, `git commit -F <file>` with a conventional-commit subject that names the issue (`fix(web): … (#N)`) and the project's co-author trailer.
 10. **Evidence.** If there are screenshots, push them per the project's evidence rule (for Flow Canvas: the `ux-evidence` orphan branch, path `<pr-number>/<surface>-<theme>-<before|after>.png`; the PR number is known only after step 11, so push evidence after the PR is created and then edit the body with `gh pr edit --body-file`).
-11. **PR.** `git push -u origin <branch>` then `gh pr create --title "<subject>" --body-file <file>`. The body follows the contract below. Then `gh issue comment N --body "Opened <PR URL> for this issue."`
+11. **PR.** `git push -u origin <branch>` then `gh pr create --title "<subject>" --body-file <file>`; add `--draft` when `land` is on, so that the human's Ready-for-review click is the landing signal. The body follows the contract below. Then comment `Opened <PR URL> for this issue.` on the issue, ending with the delegator marker: `gh issue comment N --body-file <file>`.
 12. **Oracle.** If `oracle` is on, wait up to 20 minutes polling every 2 minutes for the sticky comment and apply the Preview oracle rule. Otherwise say the check will run on the next `Review`.
 13. Report the PR URL and stop.
 
@@ -67,24 +81,26 @@ The calling command supplies these; defaults apply when it does not.
 
 1. Confirm the PR head branch starts with `<branch_prefix>`; otherwise say this PR was not opened by a delegated run and stop.
 2. Find its worktree: `git worktree list --porcelain | grep -B2 'branch refs/heads/<head branch>'`. Enter it.
-3. Fetch unresolved threads:
+3. Fetch unresolved threads and top-level comments:
 
    ```bash
    gh api graphql -F owner=<owner> -F repo=<repo> -F pr=<PR> -f query='
    query($owner:String!,$repo:String!,$pr:Int!){
      repository(owner:$owner,name:$repo){ pullRequest(number:$pr){
        reviewThreads(first:50){ nodes{ id isResolved path line
-         comments(first:20){ nodes{ body author{login} } } } } } } }'
+         comments(first:20){ nodes{ body createdAt author{login} } } } } } } }'
+   gh api repos/<owner>/<repo>/issues/<PR>/comments --paginate \
+     --jq '.[] | {id, created_at, login: .user.login, body}'
    ```
-   Keep threads where `isResolved` is false.
-4. For each thread, classify the last human comment: **actionable** (names a change, a file, or a behaviour) or **ambiguous** (a question with two readings, or a preference without a target). Post one reply on each ambiguous thread with exactly one question and stop after handling the actionable ones:
+   Keep unresolved threads whose last comment needs an answer, and top-level comments that need an answer (see **Delegator marker**).
+4. For each thread, classify the last human comment: **actionable** (names a change, a file, or a behaviour) or **ambiguous** (a question with two readings, or a preference without a target). Post one reply on each ambiguous thread with exactly one question and stop after handling the actionable ones. Every reply ends with the delegator marker. For a top-level comment, reply with `gh pr comment <PR> --body-file <file>`, whose body starts by quoting the comment's first line (`> …`).
 
    ```bash
    gh api graphql -F t=<thread id> -F b="<text>" -f query='
    mutation($t:ID!,$b:String!){ addPullRequestReviewThreadReply(input:{pullRequestReviewThreadId:$t, body:$b}){ comment{ id } } }'
    ```
 5. Hand the actionable threads to the implementer subagent (same brief shape as **Work** step 6, with the thread bodies and paths in place of the issue), then run step 7's independent check and, if `walkthrough` is on and UI files changed, step 8.
-6. Commit after approval, push, and reply on each actionable thread with one sentence naming the commit and what changed. Do not resolve threads; the reviewer resolves.
+6. Commit after approval; when **Watch** started this Review, commit without asking. Push, then reply on each actionable thread or top-level comment with one sentence naming the commit and what changed, ending with the delegator marker. Do not resolve threads; the reviewer resolves.
 7. Apply the Preview oracle rule if `oracle` is on. Report and stop.
 
 ### Blocked
@@ -119,7 +135,9 @@ Use these eight headings, in this order, every time. A section that does not app
 
 ## Never
 
-- Add `<label>` to an issue, merge a PR, resolve a review thread, or force-push.
+- Add `<label>` to an issue, resolve a review thread, force-push, or rebase a pushed branch.
+- Merge a PR, except through **Land** with `land` on.
+- Mark a PR ready for review. `gh pr ready` runs only with `--undo`; only the human marks a PR ready.
 - Remove a worktree whose PR has not merged, or delete any branch other than the local `<branch_prefix>` branch of a worktree being reclaimed — and that one only with `git branch -d`.
 - Kill a process to free a worktree directory; report the leftover path instead.
 - Run the full test suite at the repository root.
