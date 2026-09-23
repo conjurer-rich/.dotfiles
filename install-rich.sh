@@ -23,10 +23,10 @@ OVERLAY_DEST="$HOME/.claude/CLAUDE.md"
 # variables cannot carry bash arrays.
 FORK_SKILLS="browser-ux-walkthrough delegating-github-issues"
 
-BASE_URL="https://raw.githubusercontent.com/$FORK" \
-OWN_SKILLS_REPO_BASE="$FORK" \
-CLAUDE_MD_DEST="$HOME/.claude/base-CLAUDE.md" \
-EXTRA_SKILLS="$FORK_SKILLS" \
+DOTFILES_BASE_URL="https://raw.githubusercontent.com/$FORK" \
+DOTFILES_OWN_SKILLS_REPO="$FORK" \
+DOTFILES_CLAUDE_MD_DEST="$HOME/.claude/base-CLAUDE.md" \
+DOTFILES_EXTRA_SKILLS="$FORK_SKILLS" \
   "$SCRIPT_DIR/install-claude.sh" "$@"
 
 # The overlay is this fork's own file; install-claude.sh knows nothing about it.
@@ -43,12 +43,20 @@ for arg in "$@"; do
 done
 
 if [[ "$overlay_wanted" == true && -f "$OVERLAY_SRC" ]]; then
+  if [[ ! -L "$OVERLAY_DEST" ]] && cmp -s "$OVERLAY_SRC" "$OVERLAY_DEST"; then
+    echo "✓ CLAUDE.md overlay already current"
+    exit 0
+  fi
+  # Stage the copy first, so a failed copy never leaves the user without a
+  # CLAUDE.md.
+  mkdir -p "$(dirname "$OVERLAY_DEST")"
+  staged="$(mktemp "${OVERLAY_DEST}.new.XXXXXXXX")"
+  cp "$OVERLAY_SRC" "$staged"
   if [[ -e "$OVERLAY_DEST" || -L "$OVERLAY_DEST" ]]; then
     backup="$(mktemp "${OVERLAY_DEST}.backup.XXXXXXXX")"
     echo "→ Backing up existing CLAUDE.md to $backup"
     mv "$OVERLAY_DEST" "$backup"
   fi
-  mkdir -p "$(dirname "$OVERLAY_DEST")"
-  cp "$OVERLAY_SRC" "$OVERLAY_DEST"
+  mv "$staged" "$OVERLAY_DEST"
   echo "✓ CLAUDE.md overlay installed (imports ~/.claude/base-CLAUDE.md)"
 fi
