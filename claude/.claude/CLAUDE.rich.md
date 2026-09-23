@@ -24,6 +24,7 @@ For refactoring methodology, load the `refactoring` skill.
 For removing total branches, states, dependencies, layers, flags, retries, jobs, or operational moving parts from a selected existing path while conserving behavior, load the `reduce-system-complexity` skill. Pure reductions use the verified REFACTOR path, not a fabricated structural RED test.
 For reviewing whether a test suite's design actually pins behavior, load the `test-design-reviewer` skill.
 For CI failure diagnosis, load the `ci-debugging` skill.
+For local or runtime failure diagnosis — an error message, permission denial, crash, or wrong output outside CI — load `debugging` to preserve evidence, localize one causal hypothesis at a time, and fix the earliest shared owning boundary when a fix is requested.
 For pre-commit verification of a change set before staging, load the `pre-commit` skill.
 For assessing or raising the quality bar of a change against a project's quality model, load the `quality` skill.
 For standing up a new project from scratch, load the `scaffold-new-project` skill.
