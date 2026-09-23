@@ -49,6 +49,7 @@ reject_regex() {
 require_text '| `land` | off |' "land parameter defaults to off"
 require_text 'add `--draft` when `land` is on' "Work opens a draft when land is on"
 require_text '<!-- delegator -->' "delegator comments carry the marker"
+require_text 'Every comment and thread reply the delegator posts therefore ends with' "every delegator post is marked"
 require_text 'does not end in `[bot]`' "bot comments never need an answer"
 require_text 'does not contain `<!-- preview-`' "preview stickies never need an answer"
 require_text 'issues/<PR>/comments --paginate' "Review reads top-level PR comments"
@@ -73,6 +74,19 @@ require_text 'Check `isDraft` again' "a PR returned to draft mid-land is not mer
 require_text '--squash --match-head-commit <verified SHA>' "only the verified head is merged"
 require_text 'Fix or answer, then mark the PR ready again.' "bail-out hands the PR back to the human"
 reject_regex 'git rebase|git push (--force|-f)' "Land never rebases or force-pushes"
+require_text 'force-push, or rebase a pushed branch' "the Never list forbids force-push and rebase"
+require_text 'If the PR is now a draft, its head is no longer the verified SHA, or a comment needs an answer, stop without merging.' "a PR changed mid-land is not merged"
+require_text 'continue only when every changed path is one the project'"'"'s CI ignores' "no checks passes only for CI-ignored paths"
+
+# Review findings: resume, late commits, answers, unattended failures
+require_text 'Steps 1–3 always run, including on resume.' "resuming Land still checks eligibility"
+require_text 'Bail-out** with the reason `commits after Ready`' "a commit pushed after Ready is not landed"
+require_text '<!-- delegator reply-to: <comment id> -->' "a top-level answer names the comment it answers"
+require_text 'pulls/<PR>/reviews --paginate' "a review summary body is read as a comment"
+require_text 'Never go to **Blocked** from **Watch** or **Land**.' "an unattended run never waits on approval"
+require_text 'timeout 540 gh pr checks' "each CI wait fits one tool call"
+require_text 'If `gh pr merge` exits non-zero, go to **Bail-out**' "a refused merge hands the PR back"
+reject_regex 'search "head:' "Watch filters branches locally, not by fuzzy search"
 
 echo ""
 

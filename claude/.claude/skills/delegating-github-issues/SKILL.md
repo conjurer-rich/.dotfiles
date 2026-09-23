@@ -34,7 +34,7 @@ A comment **needs an answer** when all four hold:
 - it does not contain `<!-- delegator`;
 - its author login does not end in `[bot]`;
 - it does not contain `<!-- preview-`;
-- no comment containing `<!-- delegator` follows it: in the same review thread for an inline comment, or on the PR conversation for a top-level comment.
+- it has not been answered. An inline comment is answered when a comment containing `<!-- delegator` follows it in the same review thread. A top-level comment or review body is answered when a PR comment contains `<!-- delegator reply-to: <comment id> -->` with its id; Land's own status comments answer nothing.
 
 ## Entry points
 
@@ -91,16 +91,19 @@ A comment **needs an answer** when all four hold:
          comments(first:20){ nodes{ body createdAt author{login} } } } } } } }'
    gh api repos/<owner>/<repo>/issues/<PR>/comments --paginate \
      --jq '.[] | {id, created_at, login: .user.login, body}'
+   gh api repos/<owner>/<repo>/pulls/<PR>/reviews --paginate \
+     --jq '.[] | select(.body != "") | {id, submitted_at, login: .user.login, body}'
    ```
-   Keep unresolved threads whose last comment needs an answer, and top-level comments that need an answer (see **Delegator marker**).
-4. For each thread, classify the last human comment: **actionable** (names a change, a file, or a behaviour) or **ambiguous** (a question with two readings, or a preference without a target). Post one reply on each ambiguous thread with exactly one question and stop after handling the actionable ones. Every reply ends with the delegator marker. For a top-level comment, reply with `gh pr comment <PR> --body-file <file>`, whose body starts by quoting the comment's first line (`> …`).
+   Keep unresolved threads whose last comment needs an answer, and top-level comments and review bodies that need an answer (see **Delegator marker**).
+4. For each thread, classify the last human comment: **actionable** (names a change, a file, or a behaviour) or **ambiguous** (a question with two readings, or a preference without a target). Post one reply on each ambiguous thread with exactly one question and stop after handling the actionable ones. Every reply ends with the delegator marker. For a top-level comment or review body, reply with `gh pr comment <PR> --body-file <file>`, whose body starts by quoting the comment's first line (`> …`) and ends with `<!-- delegator reply-to: <comment id> -->` in place of the plain marker.
 
    ```bash
    gh api graphql -F t=<thread id> -F b="<text>" -f query='
    mutation($t:ID!,$b:String!){ addPullRequestReviewThreadReply(input:{pullRequestReviewThreadId:$t, body:$b}){ comment{ id } } }'
    ```
 5. Hand the actionable threads to the implementer subagent (same brief shape as **Work** step 6, with the thread bodies and paths in place of the issue), then run step 7's independent check and, if `walkthrough` is on and UI files changed, step 8.
-6. Commit after approval; when **Watch** started this Review, commit without asking. Push, then reply on each actionable thread or top-level comment with one sentence naming the commit and what changed, ending with the delegator marker. Do not resolve threads; the reviewer resolves.
+   When **Watch** or **Land** started this Review and the implementer cannot pass the gate, or `tdd-guardian` fails its one round, discard the staged changes (`git restore --staged --worktree .`), reply on each actionable thread or comment with the failure in one sentence, and stop; under Land, go to **Bail-out**. Never go to **Blocked** from **Watch** or **Land**.
+6. Commit after approval; when **Watch** or **Land** started this Review, commit without asking. Push, then reply on each actionable thread or top-level comment with one sentence naming the commit and what changed, ending with the delegator marker (the `reply-to` form for a top-level comment). Do not resolve threads; the reviewer resolves.
 7. Apply the Preview oracle rule if `oracle` is on. Report and stop.
 
 ### Watch
@@ -108,19 +111,20 @@ A comment **needs an answer** when all four hold:
 One pass over every open delegated PR, built to run under `/loop`. Watch holds no state between passes; everything it needs is on GitHub, so a restarted loop loses nothing.
 
 1. **Reclaim** as in **Work** step 2.
-2. `gh pr list --state open --search "head:<branch_prefix>" --limit 100 --json number,isDraft,headRefName,headRefOid,createdAt`. Keep only PRs whose `headRefName` starts with `<branch_prefix>`; the search is fuzzy.
+2. `gh pr list --state open --limit 100 --json number,isDraft,headRefName,headRefOid,createdAt --jq '[.[] | select(.headRefName | startswith("<branch_prefix>"))]'`.
 3. Classify each PR:
-   - **Needs review**: at least one review thread or top-level comment needs an answer (see **Delegator marker**), and the PR is a draft or `land` is off.
-   - **Ready**: `land` is on, `isDraft` is false, and the timeline holds a ready event:
+   - **Needs review**: at least one review thread, top-level comment or review body needs an answer (see **Delegator marker**), and the PR is a draft or `land` is off.
+   - **Ready**: `land` is on and, from this query, `isDraft` is false and `ready.totalCount` is above 0:
 
      ```bash
      gh api graphql -F owner=<owner> -F repo=<repo> -F pr=<PR> -f query='
      query($owner:String!,$repo:String!,$pr:Int!){
-       repository(owner:$owner,name:$repo){ pullRequest(number:$pr){
-         timelineItems(itemTypes:[READY_FOR_REVIEW_EVENT], last:1){ totalCount } } } }'
+       repository(owner:$owner,name:$repo){ pullRequest(number:$pr){ isDraft headRefOid
+         ready: timelineItems(itemTypes:[READY_FOR_REVIEW_EVENT]){ totalCount }
+         latest: timelineItems(itemTypes:[READY_FOR_REVIEW_EVENT, PULL_REQUEST_COMMIT], last:1){ nodes{ __typename } } } } }'
      ```
 
-     A `totalCount` above 0 together with `isDraft` false means the human's latest click was Ready for review. A PR opened as non-draft has no such event and is never Ready.
+     That is: the human marked it ready at least once and has not returned it to draft. A PR opened as non-draft has no ready event and is never Ready. `latest` tells Land whether a commit arrived after the last Ready.
    - **Idle**: everything else. Never touched.
 4. Run **Review** on each Needs-review PR, committing without asking. Then run **Land** on each Ready PR. Work oldest `createdAt` first, one PR at a time.
 5. Report one line per PR: number, state, and the action taken or `idle`. Name idle non-draft PRs so the human sees them.
@@ -130,16 +134,16 @@ One pass over every open delegated PR, built to run under `/loop`. Watch holds n
 
 Review, simplify and merge a PR the human marked Ready for review. Land may merge only what the human approved plus changes that preserve behaviour. Anything else goes to **Bail-out**.
 
-Land can resume. Before step 1, read the latest land marker:
+Land can resume. Steps 1–3 always run, including on resume. The latest land marker says how far a previous Land got:
 
 ```bash
 gh api repos/<owner>/<repo>/issues/<PR>/comments --paginate \
   --jq '[.[] | select(.body | contains("<!-- delegator land: reviewed ")) | .body] | last'
 ```
 
-If the SHA in it equals the PR's current `headRefOid`, steps 4–6 are done; go to step 7.
+When the SHA in it equals the PR's current `headRefOid`, Land already verified this head: after step 3, go to step 7.
 
-1. **Eligibility.** The head branch starts with `<branch_prefix>`, and the PR is **Ready** as **Watch** step 3 defines it. If `land` is off, say so and stop. If the PR is not Ready, say so and stop.
+1. **Eligibility.** If `land` is off, say so and stop. The head branch must start with `<branch_prefix>`, and the PR must be **Ready** as **Watch** step 3 defines it; if not, say so and stop. Unless the land marker names the current head, `latest` in that query must be a `ReadyForReviewEvent`. A commit after the human's last Ready was not approved, so go to **Bail-out** with the reason `commits after Ready`.
 2. **Worktree.** Find the branch's worktree as in **Review** step 2. If none exists, `git fetch origin <branch>`, then `git worktree add <path> <branch>`, then bootstrap it the way the project's root CLAUDE.md says.
 3. **Open review first.** If any thread or top-level comment needs an answer, run **Review** steps 4–6, committing without asking. The human marked the PR ready with it open, so a clear request is a request to address. An ambiguous comment gets its single question and then **Bail-out** with the reason `question pending`.
 4. **Bring up to date.** `git fetch origin`, then `git merge --no-edit origin/<default branch>`. Resolve a conflict in place only when it is one of these textual kinds:
@@ -154,14 +158,14 @@ If the SHA in it equals the PR's current `headRefOid`, steps 4–6 are done; go 
 
    > Work only inside `<worktree path>`. Run `/code-review` at medium effort and `/simplify` on the diff against `origin/<default branch>`. Apply only changes that preserve behaviour; do not change any test's assertions. Do not fix anything that needs a behaviour change: return it instead. Run the project's pre-push self-check. If you changed production files, run the project's mutation gate scoped to those files and revert any simplification that lowers the covered score. Do not commit; leave the changes staged. Return: (a) the files changed, (b) every finding that needs a behaviour change, with file and line, (c) the verification commands and their last ten lines, (d) the mutation outcome or `N/A` with the reason.
 
-   If (b) is not empty, go to **Bail-out** and list the findings. If test files changed, run **Work** step 7's `tdd-guardian` check on the staged diff.
-6. **Commit and push.** Commit without asking. Use one commit for the merge from step 4 (git has already made it when there was no conflict), and `refactor: simplify after review (#PR)` for step 5's changes when there are any. Each commit carries the project's co-author trailer. Then `git push`, with no force flag. Post a PR comment whose body is `Reviewed <sha> for landing.`, followed by the line `<!-- delegator land: reviewed <sha> -->` and the delegator marker, where `<sha>` is the new `headRefOid`.
-7. **Wait for CI.** `gh pr checks <PR> --watch --fail-fast`, for up to 30 minutes.
+   If (b) is not empty, or the pre-push self-check fails, go to **Bail-out** and list the findings. If test files changed, run the project's `tdd-guardian` agent on the staged diff; any finding goes to **Bail-out**.
+6. **Commit and push.** Commit without asking. Step 4's merge is one commit: git made it already when there was no conflict; after resolving a conflict, commit it with the project's co-author trailer. Commit step 5's changes, when there are any, as `refactor: simplify after review (#PR)` with the trailer. Then `git push`, with no force flag. Post a PR comment whose body is `Reviewed <sha> for landing.`, followed by the line `<!-- delegator land: reviewed <sha> -->` and the delegator marker, where `<sha>` is the new `headRefOid`.
+7. **Wait for CI.** Run `timeout 540 gh pr checks <PR> --watch --fail-fast` up to three times, so that each wait fits inside one 10-minute tool call.
    - A failing check: **Bail-out**, naming the check and the last lines of `gh run view <run> --log-failed`.
-   - Still pending after 30 minutes: stop this Land, leaving the PR as it is. The next Watch pass resumes at this step through the land marker.
+   - Still pending after the third wait: stop this Land, leaving the PR as it is. The next Watch pass resumes at this step through the land marker.
    - `no checks reported`: continue only when every changed path is one the project's CI ignores (for Flow Canvas, `docs/**`, `**/*.md`, `.claude/**`); otherwise wait as for pending.
    - Preview E2E is a merge gate only when `oracle` is on, and then by the Preview oracle rule.
-8. **Merge.** Check `isDraft` again (`gh pr view <PR> --json isDraft,headRefOid`). If the PR is now a draft, or its head is no longer the verified SHA, stop without merging. Otherwise run `gh pr merge <PR> --squash --match-head-commit <verified SHA>`.
+8. **Merge.** Check `isDraft` again (`gh pr view <PR> --json isDraft,headRefOid`) and re-read the comments as in **Review** step 3. If the PR is now a draft, its head is no longer the verified SHA, or a comment needs an answer, stop without merging. The next Watch pass picks it up. Otherwise run `gh pr merge <PR> --squash --match-head-commit <verified SHA>`. If `gh pr merge` exits non-zero, go to **Bail-out** with its error output.
 9. **After merge.** Reclaim this worktree at once under **Work** step 2's Reclaim rules. Comment `Merged in <merge sha> via Land.` on the PR and `Landed in <PR URL>.` on the issue, each ending with the delegator marker. Report the merge SHA and stop.
 
 #### Bail-out
