@@ -1,6 +1,6 @@
 ---
 name: delegating-github-issues
-description: Take a triaged GitHub issue end-to-end to a reviewable pull request in an isolated worktree, then address review threads on request. Use when a project command such as /delegate asks to pick up an issue, work a specific issue number, or address review comments on a PR the delegator opened. Not for merging, triage, or writing production code in the calling session.
+description: Take a triaged GitHub issue end-to-end to a reviewable pull request in an isolated worktree, then address review comments on request. With the land parameter on, also watch delegated PRs and review, simplify and merge one the human marked Ready for review. Use when a project command such as /delegate asks to pick up an issue, work a specific issue number, address review comments on a PR the delegator opened, watch delegated PRs, or land one. Not for triage, merging PRs the delegator did not open, or writing production code in the calling session.
 ---
 
 # Delegating GitHub issues
@@ -125,6 +125,55 @@ One pass over every open delegated PR, built to run under `/loop`. Watch holds n
 4. Run **Review** on each Needs-review PR, committing without asking. Then run **Land** on each Ready PR. Work oldest `createdAt` first, one PR at a time.
 5. Report one line per PR: number, state, and the action taken or `idle`. Name idle non-draft PRs so the human sees them.
 6. Under `/loop`, schedule the next pass: about 270 seconds while any Land is waiting on CI, otherwise 1200–1800 seconds.
+
+### Land `#PR`
+
+Review, simplify and merge a PR the human marked Ready for review. Land may merge only what the human approved plus changes that preserve behaviour. Anything else goes to **Bail-out**.
+
+Land can resume. Before step 1, read the latest land marker:
+
+```bash
+gh api repos/<owner>/<repo>/issues/<PR>/comments --paginate \
+  --jq '[.[] | select(.body | contains("<!-- delegator land: reviewed ")) | .body] | last'
+```
+
+If the SHA in it equals the PR's current `headRefOid`, steps 4–6 are done; go to step 7.
+
+1. **Eligibility.** The head branch starts with `<branch_prefix>`, and the PR is **Ready** as **Watch** step 3 defines it. If `land` is off, say so and stop. If the PR is not Ready, say so and stop.
+2. **Worktree.** Find the branch's worktree as in **Review** step 2. If none exists, `git fetch origin <branch>`, then `git worktree add <path> <branch>`, then bootstrap it the way the project's root CLAUDE.md says.
+3. **Open review first.** If any thread or top-level comment needs an answer, run **Review** steps 4–6, committing without asking. The human marked the PR ready with it open, so a clear request is a request to address. An ambiguous comment gets its single question and then **Bail-out** with the reason `question pending`.
+4. **Bring up to date.** `git fetch origin`, then `git merge --no-edit origin/<default branch>`. Resolve a conflict in place only when it is one of these textual kinds:
+   - import order;
+   - a migration-prefix collision (renumber to the next free prefix);
+   - a generated file that the project regenerates (for Flow Canvas, `openapi.json` via `pnpm openapi:generate`);
+   - lockfile churn (re-run the install);
+   - edits to adjacent lines that do not overlap in what they do.
+
+   Any other conflict is semantic: `git merge --abort`, then **Bail-out** naming the conflicting files.
+5. **Review and simplify.** Dispatch one subagent with `subagent_type: general-purpose`, `model: opus`, `run_in_background: false`, with the Work step 6 brief shape, the PR title, body and diff (`git diff origin/<default branch>...HEAD`), and these instructions:
+
+   > Work only inside `<worktree path>`. Run `/code-review` at medium effort and `/simplify` on the diff against `origin/<default branch>`. Apply only changes that preserve behaviour; do not change any test's assertions. Do not fix anything that needs a behaviour change: return it instead. Run the project's pre-push self-check. If you changed production files, run the project's mutation gate scoped to those files and revert any simplification that lowers the covered score. Do not commit; leave the changes staged. Return: (a) the files changed, (b) every finding that needs a behaviour change, with file and line, (c) the verification commands and their last ten lines, (d) the mutation outcome or `N/A` with the reason.
+
+   If (b) is not empty, go to **Bail-out** and list the findings. If test files changed, run **Work** step 7's `tdd-guardian` check on the staged diff.
+6. **Commit and push.** Commit without asking. Use one commit for the merge from step 4 (git has already made it when there was no conflict), and `refactor: simplify after review (#PR)` for step 5's changes when there are any. Each commit carries the project's co-author trailer. Then `git push`, with no force flag. Post a PR comment whose body is `Reviewed <sha> for landing.`, followed by the line `<!-- delegator land: reviewed <sha> -->` and the delegator marker, where `<sha>` is the new `headRefOid`.
+7. **Wait for CI.** `gh pr checks <PR> --watch --fail-fast`, for up to 30 minutes.
+   - A failing check: **Bail-out**, naming the check and the last lines of `gh run view <run> --log-failed`.
+   - Still pending after 30 minutes: stop this Land, leaving the PR as it is. The next Watch pass resumes at this step through the land marker.
+   - `no checks reported`: continue only when every changed path is one the project's CI ignores (for Flow Canvas, `docs/**`, `**/*.md`, `.claude/**`); otherwise wait as for pending.
+   - Preview E2E is a merge gate only when `oracle` is on, and then by the Preview oracle rule.
+8. **Merge.** Check `isDraft` again (`gh pr view <PR> --json isDraft,headRefOid`). If the PR is now a draft, or its head is no longer the verified SHA, stop without merging. Otherwise run `gh pr merge <PR> --squash --match-head-commit <verified SHA>`.
+9. **After merge.** Reclaim this worktree at once under **Work** step 2's Reclaim rules. Comment `Merged in <merge sha> via Land.` on the PR and `Landed in <PR URL>.` on the issue, each ending with the delegator marker. Report the merge SHA and stop.
+
+#### Bail-out
+
+1. `gh pr ready --undo <PR>`.
+2. Post one PR comment, ending with the delegator marker, containing:
+   - the Land step that stopped;
+   - the reason, in one sentence;
+   - any findings, as a list;
+   - `Fix or answer, then mark the PR ready again.`
+3. Push nothing new. Before step 6, abort any in-progress merge (`git merge --abort`) and discard staged and unstaged Land changes (`git restore --staged --worktree .`). A merge commit that step 4 completed stays local: removing it would rewrite history, and the next Review push carries it harmlessly. At step 7, the pushed commits stay; name them in the comment.
+4. Stop Land for this PR. The next Watch pass sees a draft. A new Ready click makes a new ready event and a new Land.
 
 ### Blocked
 

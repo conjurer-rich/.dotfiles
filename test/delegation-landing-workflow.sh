@@ -63,6 +63,17 @@ require_text 'never Ready' "a PR opened as non-draft is never landed"
 require_text 'holds no state between passes' "Watch keeps no local state"
 require_text 'about 270 seconds while any Land is waiting on CI' "Watch paces faster only while CI is pending"
 
+# Task 3: Land
+require_text '### Land `#PR`' "Land entry point exists"
+require_text 'If `land` is off, say so and stop.' "Land refuses when land is off"
+require_text 'git merge --no-edit origin/<default branch>' "conflicts are resolved by merging main in"
+require_text '<!-- delegator land: reviewed <sha> -->' "Land records the SHA it verified"
+require_text 'no checks reported' "a docs-only PR with no CI checks can land"
+require_text 'Check `isDraft` again' "a PR returned to draft mid-land is not merged"
+require_text '--squash --match-head-commit <verified SHA>' "only the verified head is merged"
+require_text 'Fix or answer, then mark the PR ready again.' "bail-out hands the PR back to the human"
+reject_regex 'git rebase|git push (--force|-f)' "Land never rebases or force-pushes"
+
 echo ""
 
 if [ "$FAILURES" -gt 0 ]; then
