@@ -38,7 +38,7 @@ INSTALL_OPENCODE=false
 INSTALL_EXTERNAL=true
 INSTALL_IMPECCABLE=true
 INSTALL_PONYTAIL=true
-BASE_URL="https://raw.githubusercontent.com/citypaul/.dotfiles"
+BASE_URL="${DOTFILES_BASE_URL:-https://raw.githubusercontent.com/citypaul/.dotfiles}"
 SKILLS_CLI_VERSION="1.5.22" # https://github.com/vercel-labs/skills/tree/v1.5.22
 
 # Reviewed immutable source revisions. Every source is pinned to a commit and
@@ -48,7 +48,7 @@ SKILLS_CLI_VERSION="1.5.22" # https://github.com/vercel-labs/skills/tree/v1.5.22
 # fetched locally with a shallow pinned `git fetch` and handed to the CLI as a
 # local path (see fetch_pinned_source). A subpath entry limits the fetch to
 # one directory for repos far larger than their skills.
-OWN_SKILLS_REPO_BASE="citypaul/.dotfiles"
+OWN_SKILLS_REPO_BASE="${DOTFILES_OWN_SKILLS_REPO:-citypaul/.dotfiles}"
 WEB_QUALITY_SKILLS_REPO="addyosmani/web-quality-skills#95d6e255afe1596b557d7a8498517884438f5b3a"
 NEXT_SKILLS_REPO="vercel/next.js#ae1e53a11f5379e715096b829178f4df92d35044"
 NEXT_SKILLS_SUBPATH="skills"
@@ -85,6 +85,16 @@ FIRST_PARTY_SKILLS=(
   test-design-reviewer testing twelve-factor typescript-strict
   ubiquitous-language wtf xstate
 )
+
+# Additional first-party skill names contributed by a fork. Environment
+# variables cannot carry bash arrays, so the value is a space-separated string
+# split on read. Names join the reviewed manifest and are still subject to
+# validate_unique_skill_names.
+if [[ -n "${DOTFILES_EXTRA_SKILLS:-}" ]]; then
+  read -ra _extra_skills <<< "$DOTFILES_EXTRA_SKILLS"
+  FIRST_PARTY_SKILLS+=("${_extra_skills[@]}")
+fi
+
 WEB_QUALITY_SKILLS=(
   accessibility best-practices core-web-vitals performance seo web-quality-audit
 )
@@ -777,7 +787,7 @@ if [[ "$INSTALL_CLAUDE" == true ]]; then
   echo -e "${BLUE}Installing CLAUDE.md...${NC}"
   download_file \
     "$BASE_URL/$VERSION/claude/.claude/CLAUDE.md" \
-    ~/.claude/CLAUDE.md \
+    "${DOTFILES_CLAUDE_MD_DEST:-$HOME/.claude/CLAUDE.md}" \
     "CLAUDE.md"
   echo ""
 fi

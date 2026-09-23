@@ -1,0 +1,229 @@
+#!/usr/bin/env bash
+#
+# A fork needs to install its own content without editing the installer, so the
+# source repository, the CLAUDE.md destination, and the first-party skill list
+# are all environment-overridable. Defaults must stay exactly as upstream ships
+# them: an unset variable installs citypaul/.dotfiles, unchanged.
+#
+
+set -e
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+TMPDIR=$(mktemp -d)
+FAILURES=0
+
+# The stubs shadow git on PATH but still need the real binary for local
+# queries. Resolve it now, before the stub directory is prepended: Git Bash on
+# Windows ships git at /mingw64/bin/git, not /usr/bin/git.
+REAL_GIT="$(command -v git)"
+
+cleanup() { rm -rf "$TMPDIR"; }
+trap cleanup EXIT
+
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+NC='\033[0m'
+
+fail() { echo -e "${RED}FAIL${NC}: $1"; FAILURES=$((FAILURES + 1)); }
+pass() { echo -e "${GREEN}PASS${NC}: $1"; }
+
+RELEASE_SHA="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+mkdir -p "$TMPDIR/bin"
+
+# git stub: the remote publishes one release tag. Local queries stay real so
+# own_checkout / rev-parse behave normally.
+cat > "$TMPDIR/bin/git" <<STUB
+#!/usr/bin/env bash
+args="\$*"
+case "\$args" in
+  *ls-remote*--tags*)
+    echo "$RELEASE_SHA	refs/tags/v4.12.1"
+    exit 0 ;;
+  *ls-remote*)
+    echo "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb	refs/heads/main"
+    exit 0 ;;
+  *"remote -v"*) exec "$REAL_GIT" "\$@" ;;
+  *merge-base*) exit 1 ;;
+  *fetch*) exit 0 ;;
+  *rev-parse*|*show-ref*) exec "$REAL_GIT" "\$@" ;;
+esac
+exit 0
+STUB
+
+cat > "$TMPDIR/bin/npx" <<'STUB'
+#!/usr/bin/env bash
+printf '%s\n' "$*" >> "$NPX_LOG"
+exit 0
+STUB
+
+# curl stub: log every URL, and create whatever -o target was requested so
+# download_file's success path runs.
+cat > "$TMPDIR/bin/curl" <<'STUB'
+#!/usr/bin/env bash
+printf '%s\n' "$*" >> "$CURL_LOG"
+out=""; prev=""
+for a in "$@"; do
+  [[ "$prev" == "-o" ]] && out="$a"
+  prev="$a"
+done
+[[ -n "$out" ]] && printf '# stub content\n' > "$out"
+exit 0
+STUB
+
+chmod +x "$TMPDIR/bin/git" "$TMPDIR/bin/npx" "$TMPDIR/bin/curl"
+
+run_installer() {
+  ( cd "$REPO_ROOT" && HOME="$HOME_DIR" PATH="$TMPDIR/bin:$PATH" \
+      NPX_LOG="$NPX_LOG" CURL_LOG="$CURL_LOG" \
+      "$REPO_ROOT/install-claude.sh" "$@" 2>&1 )
+}
+
+new_case() {
+  HOME_DIR="$TMPDIR/home_$1"; NPX_LOG="$TMPDIR/npx_$1.log"; CURL_LOG="$TMPDIR/curl_$1.log"
+  mkdir -p "$HOME_DIR/.claude"
+  : > "$NPX_LOG"; : > "$CURL_LOG"
+}
+
+echo "Testing fork overrides..."
+echo ""
+
+# --- 1. DOTFILES_OWN_SKILLS_REPO redirects the skills source --------------------
+new_case own
+set +e
+OUT=$(DOTFILES_OWN_SKILLS_REPO="conjurer-rich/.dotfiles" \
+      run_installer --skills-only --no-external --no-impeccable)
+set -e
+
+if printf '%s' "$OUT" | grep -q "conjurer-rich/.dotfiles"; then
+  pass "DOTFILES_OWN_SKILLS_REPO redirects the skills source"
+else
+  fail "the overridden skills repo must be used"
+fi
+
+# --- 2. Default is unchanged when unset ------------------------------------
+new_case own_default
+set +e
+OUT2=$(run_installer --skills-only --no-external --no-impeccable)
+set -e
+
+if grep -qE 'add [^ ]*skills-src-citypaul-\.dotfiles' "$NPX_LOG"; then
+  pass "an unset DOTFILES_OWN_SKILLS_REPO still resolves citypaul/.dotfiles"
+else
+  fail "the default source must be preserved"
+fi
+
+# --- 3. DOTFILES_BASE_URL redirects artifact downloads ------------------------------
+new_case base
+set +e
+DOTFILES_BASE_URL="https://raw.githubusercontent.com/conjurer-rich/.dotfiles" \
+  run_installer --claude-only >/dev/null
+set -e
+
+if grep -q "conjurer-rich/.dotfiles" "$CURL_LOG"; then
+  pass "DOTFILES_BASE_URL redirects artifact downloads"
+else
+  fail "the overridden base URL must be used for downloads"
+fi
+
+# --- 4. DOTFILES_BASE_URL default is unchanged when unset ---------------------------
+new_case base_default
+set +e
+run_installer --claude-only >/dev/null
+set -e
+
+if grep -q "citypaul/.dotfiles" "$CURL_LOG"; then
+  pass "an unset DOTFILES_BASE_URL still downloads from citypaul/.dotfiles"
+else
+  fail "the default base URL must be preserved"
+fi
+
+# --- 5. DOTFILES_CLAUDE_MD_DEST redirects where CLAUDE.md lands ---------------------
+new_case claudemd
+set +e
+DOTFILES_CLAUDE_MD_DEST="$HOME_DIR/.claude/base-CLAUDE.md" \
+  run_installer --claude-only >/dev/null
+set -e
+
+if [[ -f "$HOME_DIR/.claude/base-CLAUDE.md" ]]; then
+  pass "DOTFILES_CLAUDE_MD_DEST redirects the CLAUDE.md destination"
+else
+  fail "CLAUDE.md must land at the overridden destination"
+fi
+
+if [[ ! -f "$HOME_DIR/.claude/CLAUDE.md" ]]; then
+  pass "the default CLAUDE.md path is left untouched when redirected"
+else
+  fail "redirecting must not also write the default path"
+fi
+
+# --- 6. CLAUDE.md destination default is unchanged when unset --------------
+new_case claudemd_default
+set +e
+run_installer --claude-only >/dev/null
+set -e
+
+if [[ -f "$HOME_DIR/.claude/CLAUDE.md" ]]; then
+  pass "an unset DOTFILES_CLAUDE_MD_DEST still writes ~/.claude/CLAUDE.md"
+else
+  fail "the default CLAUDE.md destination must be preserved"
+fi
+
+# --- 7. DOTFILES_EXTRA_SKILLS adds fork-owned names to the manifest -----------------
+new_case extra
+set +e
+DOTFILES_EXTRA_SKILLS="rich-one rich-two" \
+  run_installer --skills-only --no-external --no-impeccable >/dev/null
+set -e
+
+if grep -q "rich-one" "$NPX_LOG" && grep -q "rich-two" "$NPX_LOG"; then
+  pass "DOTFILES_EXTRA_SKILLS names are passed to the Skills CLI"
+else
+  fail "fork-contributed skill names must reach the Skills CLI"
+fi
+
+if grep -q "tdd" "$NPX_LOG"; then
+  pass "DOTFILES_EXTRA_SKILLS adds to rather than replaces the first-party list"
+else
+  fail "the upstream skill list must survive DOTFILES_EXTRA_SKILLS"
+fi
+
+# --- 8. A duplicate introduced via DOTFILES_EXTRA_SKILLS is still rejected ----------
+new_case extra_dup
+set +e
+OUT8=$(DOTFILES_EXTRA_SKILLS="tdd" \
+  run_installer --skills-only --no-external --no-impeccable); STATUS8=$?
+set -e
+
+if [[ $STATUS8 -ne 0 ]] && printf "%s" "$OUT8" | grep -q "Duplicate skill name"; then
+  pass "a duplicate name from DOTFILES_EXTRA_SKILLS is rejected"
+else
+  fail "validate_unique_skill_names must still catch duplicates"
+fi
+
+# --- 9. Generic variable names from an unrelated environment are ignored ---
+# BASE_URL in particular is common in app dev shells; honouring it would pull
+# CLAUDE.md, commands and agents from whatever server it names.
+new_case generic
+set +e
+BASE_URL="http://localhost:3000" OWN_SKILLS_REPO_BASE="evil/repo" \
+CLAUDE_MD_DEST="$HOME_DIR/elsewhere.md" EXTRA_SKILLS="stray-skill" \
+  run_installer --claude-only >/dev/null
+BASE_URL="http://localhost:3000" OWN_SKILLS_REPO_BASE="evil/repo" \
+CLAUDE_MD_DEST="$HOME_DIR/elsewhere.md" EXTRA_SKILLS="stray-skill" \
+  run_installer --skills-only --no-external --no-impeccable >/dev/null
+set -e
+
+if ! grep -q "localhost" "$CURL_LOG" && [[ -f "$HOME_DIR/.claude/CLAUDE.md" ]] \
+   && ! grep -qE "evil|stray-skill" "$NPX_LOG" && grep -q "skills-src-citypaul-" "$NPX_LOG"; then
+  pass "unprefixed BASE_URL, OWN_SKILLS_REPO_BASE, CLAUDE_MD_DEST and EXTRA_SKILLS change nothing"
+else
+  fail "only DOTFILES_-prefixed variables may redirect the installer"
+fi
+
+echo ""
+if [[ $FAILURES -gt 0 ]]; then
+  echo -e "${RED}$FAILURES test(s) failed${NC}"
+  exit 1
+fi
+echo -e "${GREEN}All tests passed${NC}"
