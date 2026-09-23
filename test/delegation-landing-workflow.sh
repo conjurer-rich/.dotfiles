@@ -71,7 +71,10 @@ require_text 'never Ready' "a PR opened as non-draft is never landed"
 require_text 'If none exists (another machine or session opened the PR), `git fetch origin <head branch>`, then `git worktree add <path> <head branch>`' "Review creates a missing worktree"
 require_text 'Find or create the branch'"'"'s worktree as in **Review** step 2.' "Land reuses Review's worktree step"
 require_text 'holds no state between passes' "Watch keeps no local state"
-require_text 'about 270 seconds while any Land is waiting on CI' "Watch paces faster only while CI is pending"
+# A foreground CI wait held the whole watcher for up to 27 minutes in dry run 2.
+# Land's long waits run in the background and wake the loop when they finish.
+require_text 'the background task that finishes wakes the loop' "a Land waiting in the background wakes the loop itself"
+reject_regex '270 seconds' "Watch no longer polls fast to babysit CI"
 
 # Task 3: Land
 require_text '### Land `#PR`' "Land entry point exists"
@@ -93,9 +96,29 @@ require_text 'Bail-out** with the reason `commits after Ready`' "a commit pushed
 require_text '<!-- delegator reply-to: <comment id> -->' "a top-level answer names the comment it answers"
 require_text 'pulls/<PR>/reviews --paginate' "a review summary body is read as a comment"
 require_text 'Never go to **Blocked** from **Watch** or **Land**.' "an unattended run never waits on approval"
-require_text 'timeout 540 gh pr checks' "each CI wait fits one tool call"
+require_text 'gh pr checks <PR> --watch --fail-fast` as a background task' "the CI wait runs in the background"
+reject_regex 'timeout 540' "no foreground CI wait sized to one tool call"
 require_text 'If `gh pr merge` exits non-zero, go to **Bail-out**' "a refused merge hands the PR back"
 reject_regex 'search "head:' "Watch filters branches locally, not by fuzzy search"
+
+# Dry run 2 findings (#1708, #1710)
+# Land's review took 24 minutes; a foreground subagent froze the watcher.
+require_text 'with `subagent_type: general-purpose`, `model: opus`, `run_in_background: true`' "Land's review runs in the background"
+require_text 'A review interrupted by a restart leaves staged changes' "a restarted Land discards a dead review's changes"
+# Another agent session answered a thread without the marker, and the watcher
+# treated its reply as the human's.
+require_text 'it does not contain the Claude Code footer' "an unmarked agent reply is not the human's"
+# Rich accepted three bail-out findings as follow-ups; the next Land must not
+# bail on them again, and must learn that from GitHub, not local state.
+require_text 'Findings listed under the PR body'"'"'s `## Found on the way, not fixed here` are accepted' "Land's review skips accepted findings"
+require_text 'asks for findings as follow-ups' "Review files follow-ups when the human asks"
+require_text 'To accept a finding instead, ask for it as a follow-up.' "bail-out says how to accept a finding"
+# A bail-out on findings threw away a verified simplification that the next
+# Land then had to redo.
+require_text 'keep verified simplifications' "a bail-out on findings keeps verified simplifications"
+# A squash merge leaves no ancestry, so reclaim compares head SHAs.
+require_text 'equals the PR'"'"'s `headRefOid`' "reclaim matches a squash-merged branch by head SHA"
+reject_regex 'and `git log origin/[^`]*` prints nothing' "reclaim never gates on ancestry"
 
 echo ""
 

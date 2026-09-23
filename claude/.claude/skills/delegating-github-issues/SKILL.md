@@ -29,12 +29,15 @@ The delegator posts through the human's `gh` auth, so a comment's author cannot 
 
     <!-- delegator -->
 
-A comment **needs an answer** when all four hold:
+Other agent sessions post through the same auth without the marker. The footer Claude Code adds (`[Claude Code](https://claude.`) identifies their posts.
+
+A comment **needs an answer** when all five hold:
 
 - it does not contain `<!-- delegator`;
+- it does not contain the Claude Code footer: another agent posted it, not the human;
 - its author login does not end in `[bot]`;
 - it does not contain `<!-- preview-`;
-- it has not been answered. An inline comment is answered when a comment containing `<!-- delegator` follows it in the same review thread. A top-level comment or review body is answered when a PR comment contains `<!-- delegator reply-to: <comment id> -->` with its id; Land's own status comments answer nothing.
+- it has not been answered. An inline comment is answered when a comment containing `<!-- delegator` or the Claude Code footer follows it in the same review thread. A top-level comment or review body is answered when a PR comment contains `<!-- delegator reply-to: <comment id> -->` with its id; Land's own status comments answer nothing.
 
 ## Entry points
 
@@ -101,6 +104,8 @@ A comment **needs an answer** when all four hold:
    gh api graphql -F t=<thread id> -F b="<text>" -f query='
    mutation($t:ID!,$b:String!){ addPullRequestReviewThreadReply(input:{pullRequestReviewThreadId:$t, body:$b}){ comment{ id } } }'
    ```
+
+   A comment that asks for findings as follow-ups needs no code. File each finding as its own issue with the `follow-up` label and no `<label>`, with acceptance criteria. Add each issue to the PR body's `## Found on the way, not fixed here` section (`gh pr edit <PR> --body-file <file>`), then reply naming the issues. The body is where **Land** learns which findings are accepted.
 5. Hand the actionable threads to the implementer subagent (same brief shape as **Work** step 6, with the thread bodies and paths in place of the issue), then run step 7's independent check and, if `walkthrough` is on and UI files changed, step 8.
    When **Watch** or **Land** started this Review and the implementer cannot pass the gate, or `tdd-guardian` fails its one round, discard the staged changes (`git restore --staged --worktree .`), reply on each actionable thread or comment with the failure in one sentence, and stop; under Land, go to **Bail-out**. Never go to **Blocked** from **Watch** or **Land**.
 6. Commit after approval; when **Watch** or **Land** started this Review, commit without asking. Push, then reply on each actionable thread or top-level comment with one sentence naming the commit and what changed, ending with the delegator marker (the `reply-to` form for a top-level comment). Do not resolve threads; the reviewer resolves.
@@ -128,7 +133,7 @@ One pass over every open delegated PR, built to run under `/loop`. Watch holds n
    - **Idle**: everything else. Never touched.
 4. Run **Review** on each Needs-review PR, committing without asking. Then run **Land** on each Ready PR. Work oldest `createdAt` first, one PR at a time.
 5. Report one line per PR: number, state, and the action taken or `idle`. Name idle non-draft PRs so the human sees them.
-6. Under `/loop`, schedule the next pass: about 270 seconds while any Land is waiting on CI, otherwise 1200–1800 seconds.
+6. Under `/loop`, schedule the next pass 1200–1800 seconds out. Land's review and CI wait run in the background, and the background task that finishes wakes the loop, so a pass never polls to babysit them. To notice a Ready click or a new comment sooner, leave a background poll running between passes. It checks each delegated PR's draft state and unanswered comments, plus any new delegated PR, about once a minute, and exits on the first change.
 
 ### Land `#PR`
 
@@ -154,15 +159,15 @@ When the SHA in it equals the PR's current `headRefOid`, Land already verified t
    - edits to adjacent lines that do not overlap in what they do.
 
    Any other conflict is semantic: `git merge --abort`, then **Bail-out** naming the conflicting files.
-5. **Review and simplify.** Dispatch one subagent with `subagent_type: general-purpose`, `model: opus`, `run_in_background: false`, with the Work step 6 brief shape, the PR title, body and diff (`git diff origin/<default branch>...HEAD`), and these instructions:
+5. **Review and simplify.** A review interrupted by a restart leaves staged changes. Discard them (`git restore --staged --worktree .`) before dispatching again. Dispatch one subagent with `subagent_type: general-purpose`, `model: opus`, `run_in_background: true`, with the Work step 6 brief shape, the PR title, body and diff (`git diff origin/<default branch>...HEAD`), and these instructions. A review can take half an hour. Its completion notice resumes this Land, and other PRs are free to move in the meantime.
 
-   > Work only inside `<worktree path>`. Run `/code-review` at medium effort and `/simplify` on the diff against `origin/<default branch>`. Apply only changes that preserve behaviour; do not change any test's assertions. Do not fix anything that needs a behaviour change: return it instead. Run the project's pre-push self-check. If you changed production files, run the project's mutation gate scoped to those files and revert any simplification that lowers the covered score. Do not commit; leave the changes staged. Return: (a) the files changed, (b) every finding that needs a behaviour change, with file and line, (c) the verification commands and their last ten lines, (d) the mutation outcome or `N/A` with the reason.
+   > Work only inside `<worktree path>`. Run `/code-review` at medium effort and `/simplify` on the diff against `origin/<default branch>`. Apply only changes that preserve behaviour; do not change any test's assertions. Do not fix anything that needs a behaviour change: return it instead. Findings listed under the PR body's `## Found on the way, not fixed here` are accepted: name them as accepted, with their issue numbers, and do not return them. Run the project's pre-push self-check. If you changed production files, run the project's mutation gate scoped to those files and revert any simplification that lowers the covered score. Do not commit; leave the changes staged. Return: (a) the files changed, (b) every finding that needs a behaviour change, with file and line, (c) the verification commands and their last ten lines, (d) the mutation outcome or `N/A` with the reason.
 
    If (b) is not empty, or the pre-push self-check fails, go to **Bail-out** and list the findings. If test files changed, run the project's `tdd-guardian` agent on the staged diff; any finding goes to **Bail-out**.
 6. **Commit and push.** Commit without asking. Step 4's merge is one commit: git made it already when there was no conflict; after resolving a conflict, commit it with the project's co-author trailer. Commit step 5's changes, when there are any, as `refactor: simplify after review (#PR)` with the trailer. Then `git push`, with no force flag. Post a PR comment whose body is `Reviewed <sha> for landing.`, followed by the line `<!-- delegator land: reviewed <sha> -->` and the delegator marker, where `<sha>` is the new `headRefOid`.
-7. **Wait for CI.** Run `timeout 540 gh pr checks <PR> --watch --fail-fast` up to three times, so that each wait fits inside one 10-minute tool call.
+7. **Wait for CI.** Run `timeout 2400 gh pr checks <PR> --watch --fail-fast` as a background task. Its exit resumes this Land; then read `gh pr checks <PR>`.
    - A failing check: **Bail-out**, naming the check and the last lines of `gh run view <run> --log-failed`.
-   - Still pending after the third wait: stop this Land, leaving the PR as it is. The next Watch pass resumes at this step through the land marker.
+   - Still pending when the wait times out, or the session restarted mid-wait: leave the PR as it is. The next Watch pass resumes at this step through the land marker.
    - `no checks reported`: continue only when every changed path is one the project's CI ignores (for Flow Canvas, `docs/**`, `**/*.md`, `.claude/**`); otherwise wait as for pending.
    - Preview E2E is a merge gate only when `oracle` is on, and then by the Preview oracle rule.
 8. **Merge.** Check `isDraft` again (`gh pr view <PR> --json isDraft,headRefOid`) and re-read the comments as in **Review** step 3. If the PR is now a draft, its head is no longer the verified SHA, or a comment needs an answer, stop without merging. The next Watch pass picks it up. Otherwise run `gh pr merge <PR> --squash --match-head-commit <verified SHA>`. If `gh pr merge` exits non-zero, go to **Bail-out** with its error output.
@@ -171,12 +176,16 @@ When the SHA in it equals the PR's current `headRefOid`, Land already verified t
 #### Bail-out
 
 1. `gh pr ready --undo <PR>`.
-2. Post one PR comment, ending with the delegator marker, containing:
+2. Clean up the worktree. Before step 6, abort any in-progress merge (`git merge --abort`). A merge commit that step 4 completed stays: removing it would rewrite history. At step 7, the pushed commits stay.
+
+   A bail-out at step 5 on findings alone should keep verified simplifications. It qualifies when the pre-push self-check passed and `tdd-guardian`, when it ran, found nothing. Commit the staged changes as `refactor: simplify after review (#PR)` with the trailer, then `git push` with no force flag. The PR is a draft by now, so this approves nothing, and the next Land does not redo the work. Otherwise discard staged and unstaged Land changes (`git restore --staged --worktree .`) and push nothing new.
+3. Post one PR comment, ending with the delegator marker, containing:
    - the Land step that stopped;
    - the reason, in one sentence;
    - any findings, as a list;
+   - any commits that stay pushed;
    - `Fix or answer, then mark the PR ready again.`
-3. Push nothing new. Before step 6, abort any in-progress merge (`git merge --abort`) and discard staged and unstaged Land changes (`git restore --staged --worktree .`). A merge commit that step 4 completed stays local: removing it would rewrite history, and the next Review push carries it harmlessly. At step 7, the pushed commits stay; name them in the comment.
+   - `To accept a finding instead, ask for it as a follow-up.`
 4. Stop Land for this PR. The next Watch pass sees a draft. A new Ready click makes a new ready event and a new Land.
 
 ### Blocked
