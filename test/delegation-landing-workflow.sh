@@ -60,6 +60,11 @@ reject_regex 'merge a PR, resolve a review thread' "the unconditional never-merg
 # Task 2: Watch
 require_text '### Watch' "Watch entry point exists"
 require_text 'READY_FOR_REVIEW_EVENT' "Ready is read from the PR timeline"
+# timelineItems' totalCount ignores itemTypes and counts every timeline item,
+# so a gate on it calls every PR ready. filteredCount is the filtered count.
+require_text 'ready: timelineItems(itemTypes:[READY_FOR_REVIEW_EVENT]){ filteredCount }' "Ready counts only ready events"
+require_text '`ready.filteredCount` is above 0' "Ready gates on the filtered count"
+reject_regex 'totalCount' "no gate reads the unfiltered timeline count"
 require_text 'never Ready' "a PR opened as non-draft is never landed"
 require_text 'holds no state between passes' "Watch keeps no local state"
 require_text 'about 270 seconds while any Land is waiting on CI' "Watch paces faster only while CI is pending"
