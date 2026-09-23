@@ -48,8 +48,8 @@ jobs:
       - name: Create Git Tag and GitHub Release
         if: steps.changesets.outputs.hasChangesets == 'false'
         run: |
-          # Get the version from package.json
-          VERSION=$(node -p "require('./package.json').version")
+          # Get the fork's release version
+          VERSION=$(node -p "require('./fork/package.json').version")
           TAG_NAME="v${VERSION}"
 
           # Check if tag already exists
