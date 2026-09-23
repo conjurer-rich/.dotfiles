@@ -88,15 +88,15 @@ new_case() {
 echo "Testing fork overrides..."
 echo ""
 
-# --- 1. OWN_SKILLS_REPO_BASE redirects the skills source --------------------
+# --- 1. DOTFILES_OWN_SKILLS_REPO redirects the skills source --------------------
 new_case own
 set +e
-OUT=$(OWN_SKILLS_REPO_BASE="conjurer-rich/.dotfiles" \
+OUT=$(DOTFILES_OWN_SKILLS_REPO="conjurer-rich/.dotfiles" \
       run_installer --skills-only --no-external --no-impeccable)
 set -e
 
 if printf '%s' "$OUT" | grep -q "conjurer-rich/.dotfiles"; then
-  pass "OWN_SKILLS_REPO_BASE redirects the skills source"
+  pass "DOTFILES_OWN_SKILLS_REPO redirects the skills source"
 else
   fail "the overridden skills repo must be used"
 fi
@@ -107,46 +107,46 @@ set +e
 OUT2=$(run_installer --skills-only --no-external --no-impeccable)
 set -e
 
-if printf '%s' "$OUT2" | grep -q "citypaul/.dotfiles"; then
-  pass "an unset OWN_SKILLS_REPO_BASE still resolves citypaul/.dotfiles"
+if grep -qE 'add [^ ]*skills-src-citypaul-\.dotfiles' "$NPX_LOG"; then
+  pass "an unset DOTFILES_OWN_SKILLS_REPO still resolves citypaul/.dotfiles"
 else
   fail "the default source must be preserved"
 fi
 
-# --- 3. BASE_URL redirects artifact downloads ------------------------------
+# --- 3. DOTFILES_BASE_URL redirects artifact downloads ------------------------------
 new_case base
 set +e
-BASE_URL="https://raw.githubusercontent.com/conjurer-rich/.dotfiles" \
+DOTFILES_BASE_URL="https://raw.githubusercontent.com/conjurer-rich/.dotfiles" \
   run_installer --claude-only >/dev/null
 set -e
 
 if grep -q "conjurer-rich/.dotfiles" "$CURL_LOG"; then
-  pass "BASE_URL redirects artifact downloads"
+  pass "DOTFILES_BASE_URL redirects artifact downloads"
 else
   fail "the overridden base URL must be used for downloads"
 fi
 
-# --- 4. BASE_URL default is unchanged when unset ---------------------------
+# --- 4. DOTFILES_BASE_URL default is unchanged when unset ---------------------------
 new_case base_default
 set +e
 run_installer --claude-only >/dev/null
 set -e
 
 if grep -q "citypaul/.dotfiles" "$CURL_LOG"; then
-  pass "an unset BASE_URL still downloads from citypaul/.dotfiles"
+  pass "an unset DOTFILES_BASE_URL still downloads from citypaul/.dotfiles"
 else
   fail "the default base URL must be preserved"
 fi
 
-# --- 5. CLAUDE_MD_DEST redirects where CLAUDE.md lands ---------------------
+# --- 5. DOTFILES_CLAUDE_MD_DEST redirects where CLAUDE.md lands ---------------------
 new_case claudemd
 set +e
-CLAUDE_MD_DEST="$HOME_DIR/.claude/base-CLAUDE.md" \
+DOTFILES_CLAUDE_MD_DEST="$HOME_DIR/.claude/base-CLAUDE.md" \
   run_installer --claude-only >/dev/null
 set -e
 
 if [[ -f "$HOME_DIR/.claude/base-CLAUDE.md" ]]; then
-  pass "CLAUDE_MD_DEST redirects the CLAUDE.md destination"
+  pass "DOTFILES_CLAUDE_MD_DEST redirects the CLAUDE.md destination"
 else
   fail "CLAUDE.md must land at the overridden destination"
 fi
@@ -164,41 +164,61 @@ run_installer --claude-only >/dev/null
 set -e
 
 if [[ -f "$HOME_DIR/.claude/CLAUDE.md" ]]; then
-  pass "an unset CLAUDE_MD_DEST still writes ~/.claude/CLAUDE.md"
+  pass "an unset DOTFILES_CLAUDE_MD_DEST still writes ~/.claude/CLAUDE.md"
 else
   fail "the default CLAUDE.md destination must be preserved"
 fi
 
-# --- 7. EXTRA_SKILLS adds fork-owned names to the manifest -----------------
+# --- 7. DOTFILES_EXTRA_SKILLS adds fork-owned names to the manifest -----------------
 new_case extra
 set +e
-EXTRA_SKILLS="rich-one rich-two" \
+DOTFILES_EXTRA_SKILLS="rich-one rich-two" \
   run_installer --skills-only --no-external --no-impeccable >/dev/null
 set -e
 
 if grep -q "rich-one" "$NPX_LOG" && grep -q "rich-two" "$NPX_LOG"; then
-  pass "EXTRA_SKILLS names are passed to the Skills CLI"
+  pass "DOTFILES_EXTRA_SKILLS names are passed to the Skills CLI"
 else
   fail "fork-contributed skill names must reach the Skills CLI"
 fi
 
 if grep -q "tdd" "$NPX_LOG"; then
-  pass "EXTRA_SKILLS adds to rather than replaces the first-party list"
+  pass "DOTFILES_EXTRA_SKILLS adds to rather than replaces the first-party list"
 else
-  fail "the upstream skill list must survive EXTRA_SKILLS"
+  fail "the upstream skill list must survive DOTFILES_EXTRA_SKILLS"
 fi
 
-# --- 8. A duplicate introduced via EXTRA_SKILLS is still rejected ----------
+# --- 8. A duplicate introduced via DOTFILES_EXTRA_SKILLS is still rejected ----------
 new_case extra_dup
 set +e
-OUT8=$(EXTRA_SKILLS="tdd" \
+OUT8=$(DOTFILES_EXTRA_SKILLS="tdd" \
   run_installer --skills-only --no-external --no-impeccable); STATUS8=$?
 set -e
 
 if [[ $STATUS8 -ne 0 ]] && printf "%s" "$OUT8" | grep -q "Duplicate skill name"; then
-  pass "a duplicate name from EXTRA_SKILLS is rejected"
+  pass "a duplicate name from DOTFILES_EXTRA_SKILLS is rejected"
 else
   fail "validate_unique_skill_names must still catch duplicates"
+fi
+
+# --- 9. Generic variable names from an unrelated environment are ignored ---
+# BASE_URL in particular is common in app dev shells; honouring it would pull
+# CLAUDE.md, commands and agents from whatever server it names.
+new_case generic
+set +e
+BASE_URL="http://localhost:3000" OWN_SKILLS_REPO_BASE="evil/repo" \
+CLAUDE_MD_DEST="$HOME_DIR/elsewhere.md" EXTRA_SKILLS="stray-skill" \
+  run_installer --claude-only >/dev/null
+BASE_URL="http://localhost:3000" OWN_SKILLS_REPO_BASE="evil/repo" \
+CLAUDE_MD_DEST="$HOME_DIR/elsewhere.md" EXTRA_SKILLS="stray-skill" \
+  run_installer --skills-only --no-external --no-impeccable >/dev/null
+set -e
+
+if ! grep -q "localhost" "$CURL_LOG" && [[ -f "$HOME_DIR/.claude/CLAUDE.md" ]] \
+   && ! grep -qE "evil|stray-skill" "$NPX_LOG" && grep -q "skills-src-citypaul-" "$NPX_LOG"; then
+  pass "unprefixed BASE_URL, OWN_SKILLS_REPO_BASE, CLAUDE_MD_DEST and EXTRA_SKILLS change nothing"
+else
+  fail "only DOTFILES_-prefixed variables may redirect the installer"
 fi
 
 echo ""

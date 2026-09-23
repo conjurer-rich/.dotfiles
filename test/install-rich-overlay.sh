@@ -86,35 +86,34 @@ run_wrapper() {
 echo "Testing the fork wrapper overlay..."
 echo ""
 
-# --- 1. --help must not touch the user's CLAUDE.md -------------------------
-new_case help
-set +e
-run_wrapper --help >/dev/null
-set -e
+# --- 1. --help and -h run cleanly and do not touch the user's CLAUDE.md ----
+for flag in --help -h; do
+  new_case "help${flag//-/_}"
+  set +e
+  run_wrapper "$flag" >/dev/null; status=$?
+  set -e
 
-if grep -q "the user existing CLAUDE.md" "$HOME_DIR/.claude/CLAUDE.md"; then
-  pass "--help leaves the existing CLAUDE.md untouched"
-else
-  fail "--help must not install the overlay"
-fi
+  if [[ $status -eq 0 ]] && grep -q "the user existing CLAUDE.md" "$HOME_DIR/.claude/CLAUDE.md" \
+     && ! ls "$HOME_DIR/.claude/CLAUDE.md.backup."* >/dev/null 2>&1; then
+    pass "$flag exits 0 and leaves the existing CLAUDE.md untouched, with no backup"
+  else
+    fail "$flag must exit 0 without installing the overlay (status $status)"
+  fi
+done
 
-if ! ls "$HOME_DIR/.claude/CLAUDE.md.backup."* >/dev/null 2>&1; then
-  pass "--help creates no backup"
-else
-  fail "--help must not back up a file it has no business replacing"
-fi
+# --- 2. Every mode that skips upstream's CLAUDE.md skips the overlay too ---
+for flag in --skills-only --agents-only --opencode-only; do
+  new_case "mode${flag//-/_}"
+  set +e
+  run_wrapper "$flag" --no-external --no-impeccable >/dev/null
+  set -e
 
-# --- 2. A mode that skips upstream's CLAUDE.md skips the overlay too -------
-new_case skills
-set +e
-run_wrapper --skills-only --no-external --no-impeccable >/dev/null
-set -e
-
-if grep -q "the user existing CLAUDE.md" "$HOME_DIR/.claude/CLAUDE.md"; then
-  pass "--skills-only leaves the existing CLAUDE.md untouched"
-else
-  fail "--skills-only must not install the overlay: the base is never written"
-fi
+  if grep -q "the user existing CLAUDE.md" "$HOME_DIR/.claude/CLAUDE.md"; then
+    pass "$flag leaves the existing CLAUDE.md untouched"
+  else
+    fail "$flag must not install the overlay: the base is never written"
+  fi
+done
 
 # --- 3. A run that does install upstream's CLAUDE.md installs the overlay --
 new_case claude
@@ -140,6 +139,19 @@ else
   fail "an existing CLAUDE.md must be backed up before replacement"
 fi
 
+# --- 3b. Re-running with the overlay already in place makes no new backup --
+backups_before=$(ls "$HOME_DIR/.claude/CLAUDE.md.backup."* 2>/dev/null | wc -l)
+set +e
+run_wrapper --claude-only >/dev/null
+set -e
+backups_after=$(ls "$HOME_DIR/.claude/CLAUDE.md.backup."* 2>/dev/null | wc -l)
+
+if [[ $backups_after -eq $backups_before ]] && grep -q "@~/.claude/base-CLAUDE.md" "$HOME_DIR/.claude/CLAUDE.md"; then
+  pass "a re-run over an identical overlay adds no backup"
+else
+  fail "an identical overlay must not be backed up again ($backups_before -> $backups_after)"
+fi
+
 # --- 4. Every skill in this repository reaches the fork's install call -----
 new_case manifest
 : > "$NPX_LOG"
@@ -154,7 +166,7 @@ while IFS= read -r skill_file; do
   [[ " $FORK_CALL " == *" $skill_name "* ]] || missing="$missing $skill_name"
 done < <(find "$REPO_ROOT/claude/.claude/skills" -mindepth 2 -maxdepth 2 -name SKILL.md -print)
 
-if [[ -n "$FORK_CALL" && -z "$missing" ]]; then
+if [[ -n "$FORK_CALL" && -z "$missing" ]] && ! grep -q "skills-src-citypaul-" "$NPX_LOG"; then
   pass "the wrapper installs every skill in this repository"
 else
   fail "the wrapper must install every skill in this repository; missing:${missing:- (no install call)}"

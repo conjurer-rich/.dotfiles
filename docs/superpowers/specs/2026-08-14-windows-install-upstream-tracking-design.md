@@ -107,6 +107,12 @@ Four constants become environment-overridable, following the existing pattern of
 | `install-claude.sh:70` | `FIRST_PARTY_SKILLS` gains the names parsed from `$EXTRA_SKILLS` |
 | `install-claude.sh:771` | CLAUDE.md destination becomes `${CLAUDE_MD_DEST:-$HOME/.claude/CLAUDE.md}` |
 
+> **Amended in review.** The overrides are read from `DOTFILES_`-prefixed names:
+> `DOTFILES_BASE_URL`, `DOTFILES_OWN_SKILLS_REPO`, `DOTFILES_EXTRA_SKILLS` and
+> `DOTFILES_CLAUDE_MD_DEST`. The bare names shown above are common in app dev
+> shells: a stray `BASE_URL=http://localhost:3000` would have pulled CLAUDE.md,
+> commands and agents from a dev server.
+
 Defaults are unchanged, so upstream behaviour is identical when the variables are
 unset. This keeps the permanent delta at four lines in a file upstream edits, which
 is small enough that merges stay mechanical.
