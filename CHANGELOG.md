@@ -1,5 +1,361 @@
 # Changelog
 
+## 4.17.0
+
+### Minor Changes
+
+- bcfb332: Add provider-neutral model capability tiers, runtime fallbacks, budget application, and execution-ledger guidance to graph-engineering and panel-review.
+
+### Patch Changes
+
+- ad8ff59: Remove the Karabiner-Elements config
+
+  Karabiner-Elements is no longer installed, so `install.sh` stops stowing the
+  `karabiner` package and the package itself is deleted.
+
+## 4.16.1
+
+### Patch Changes
+
+- fd017e2: Clarify endpoint and workflow ownership across personal engineering skills. Add focused Effect runtime guidance covering composition, outcome values, lifetime guarantees, and safe native logging, with complete refactoring slices and whole-path bridge accounting.
+- 2fbbaf6: Remove the CodexBar Homebrew install from `install.sh`
+
+  That cask was added to this repo by mistake; Homebrew packages belong elsewhere.
+
+## 4.16.0
+
+### Minor Changes
+
+- bc59bd6: Skill evals batch 4: quality suites for six service-side skills, and the fixes they drove
+
+  Batch 4 of the programme tracked in `evals/skills/COVERAGE.md`. Each of `api-design`,
+  `cli-design`, `bff-entry-points`, `secure-oauth-oidc`, `twelve-factor` and
+  `observability` now has a promptfoo quality suite built to the `AUTHORING.md` bar and
+  proven before its first agent run against a hand-written reference and a hand-written
+  no-skills default, with an independent verifier refuting each suite through up to two
+  repair rounds. Where a real run then showed a grader or a request marking correct work
+  down, the grader or request changed and the saved run was re-graded offline.
+
+  Highlights of what the graders check:
+
+  - `api-design` — an idempotency key whose replay carries a different body is refused,
+    failures are RFC 9457 problem documents with a 400/422 split, validation by schema at
+    the boundary, and a shipped field stays in the contract with its supersession recorded.
+  - `cli-design` — data on stdout only and diagnostics on stderr, a `--json` envelope, exit
+    codes 0/1/2/78 documented in `--help`, every non-zero exit explained on stderr with
+    stdout empty, handlers that neither print nor exit, flat human rows, TTY-gated status.
+  - `bff-entry-points` — every route through the registrar with an access declaration, no
+    weakening flags, the mutation chain (Origin, CSRF, content type) installed by the
+    registrar, a verdict-only public response, the public allowlist pinned, no-oracle
+    cross-tenant refusal, the principal from the session only, authorization inside the
+    application proven by direct calls.
+  - `secure-oauth-oidc` — S256 PKCE per transaction, a one-time session-bound state, ID
+    token claims validated, tokens never in a URL or a log, an open redirector refused, the
+    issuer bound to the transaction with two providers, and no false assurance in the reply.
+  - `twelve-factor` — schema-validated config that fails fast with no silent defaults and
+    no environment-name branching, `.env.example`, SIGTERM/SIGINT drain with a timeout and
+    closed pools, structured logs on the process streams with a configurable threshold and
+    a request id, and an admin process declared as its own process type.
+  - `observability` — one canonical event per request including the exception path,
+    allowlisted fields, semantic-convention names, high-cardinality identifiers off metric
+    labels, W3C trace context on outbound calls, ratio SLOs with multiwindow burn-rate
+    pages that link a runbook.
+
+  **What the evals caught, and what changed** (every edit anchored, verified by an
+  independent refuter node on Opus, and re-measured):
+
+  - `api-design` — asked to rename a field partners already read, one skill arm renamed it
+    and warned, the other stopped to ask. Now the additive rule outranks the wording of the
+    request and a supersession is recorded the moment it happens. 17/17 in both arms on two
+    consecutive runs (no-skills 10–13/17).
+  - `cli-design` — the forced arm printed from inside handlers, made a flag required so a
+    plain invocation exited 2, and put a success envelope on stdout for a failed gate. Now
+    the entry point is the only file that writes a stream or ends the process, any non-zero
+    exit keeps stdout empty, and status lines are TTY-gated where the stream contract is
+    stated. Forced 22/31 → 31/31 on two consecutive runs.
+  - `bff-entry-points` — the CSRF token was left as a follow-up when the session store was
+    fixed, a touched legacy route stayed mounted on the app, and no direct refusal test was
+    written. Now the token has a path (HMAC over the session id), any route you change goes
+    through the registrar, the chain lives in the registrar and nowhere else, and
+    authorization is proven by direct calls. Forced 30/33 → 33/33.
+  - `secure-oauth-oidc` — given a narrow request on a spike with known holes, both skill
+    arms delivered the ask and listed PKCE, nonce and token exposure as "pre-existing, out
+    of scope". Now the flow you touch comes up to the RFC 9700 baseline in the same change
+    and an existing token leak on the path you edit is removed. Forced 18/18 on two
+    consecutive runs; no-skills fails five rule metrics.
+  - `twelve-factor` — both skill arms left environment-name branches and deep `process.env`
+    reads in place, wrote no `.env.example`, and shipped a logger with a fixed level and no
+    request id. Now a config module moves every env read in the same change and the sweep
+    is grepped, a branch becomes a named setting and is deleted, and a logging change ships
+    the request id. Forced 26/33 → 32/33.
+  - `observability` — the canonical event vanished on the exception path, console calls
+    survived in the touched file, and a home-made header stood in for `traceparent`. Now
+    the skill gives the construction rule (open the try before parsing, one exit in the
+    finally, proved by a throw), scopes console removal to the file, and says to inject
+    trace context on every outbound call. Forced 19–20/20 across five runs against a
+    no-skills arm at 17–20/20: this suite discriminates weakly and is the batch's open
+    item.
+  - Routing: tdd's companions, react-performance symptoms (batch 3) and now correlation
+    and tenant-leak phrasings for observability and bff-entry-points, each routing 3/3.
+
+  Harness: hidden acceptance tests can run under a per-suite vitest config, because an
+  agent's own setup file registered a global tracer provider and swallowed every span the
+  observability tests observe; graders across the batch count only net-new lines, accept
+  an injected signal source, and require NO_COLOR handling only of a tool that emits colour.
+
+## 4.15.0
+
+### Minor Changes
+
+- 640a334: Improve graph orchestration and external-skill verification.
+
+  Bound graph fan-in, require authoritative install checks, and add focused quality suites for both skills.
+
+- 08c3dae: Skill evals batch 3: quality suites for five more skills, the fixes they drove, and the
+  tdd routing hub naming its companions
+
+  Batch 3 of the programme tracked in `evals/skills/COVERAGE.md`. Each of `xstate`,
+  `front-end-testing`, `react-testing`, `react-performance` and `event-sourcing` now has a
+  promptfoo quality suite built to the `AUTHORING.md` bar and proven against hand-written
+  references before its first agent run, with an independent verifier node refuting each
+  suite through up to three repair rounds. Where a real run then showed a grader marking
+  correct work down, the grader changed and the saved run was re-graded offline.
+
+  Highlights of what the graders check:
+
+  - `xstate` — the flow is a `setup().createMachine` with named implementations, the
+    component is driven by an actor hook with no temporal `useState` left behind, effects
+    are invoked actors with `onDone`/`onError`, events are named for what happened, no v4
+    vocabulary, headless machine tests driven by events, a retry cooldown as a state-owned
+    delay, cancellation as a state an event can leave, and a `stateDiagram-v2` render
+    beside the machine whose states match it.
+  - `front-end-testing` — the lightest harness that proves the claim (a component-level
+    claim never gets a Playwright journey; a journey claim never gets a DOM test), queries
+    by role and label, no arbitrary waits, the network observed through MSW rather than a
+    stubbed fetch or a mocked request module, the module under test never mocked, and a
+    hand-back that names the harness and where its evidence stops.
+  - `react-testing` — role, label or visible-text queries even though every element
+    carries a planted `data-testid`, `userEvent` over `fireEvent`, hooks through
+    `renderHook`, no manual `act()` around interactions, the whole tree rendered rather
+    than a mocked child, Browser Mode for a focus/clipping claim jsdom can only fake, and
+    planted mutants caught.
+  - `react-performance` — a measurement before the first production edit and after the
+    last, behaviour tests unchanged and green, one optimisation kind per diff, no `any`
+    or shared mutation traded for speed, before/after numbers in the reply, and the
+    fixture's own benchmark re-run over the committed harness and the agent's code so the
+    number cannot be moved by editing the harness.
+  - `event-sourcing` — a pure decider, past-tense business events, state rebuilt by
+    folding, optimistic concurrency on append, stored events never mutated, read models as
+    projections, plus the four checklist rules no arm delivered on the first run: every
+    stored event in an envelope separate from its payload, stored events validated by a
+    tolerant reader before the fold, a versioning strategy before the first event ships,
+    and a projection rebuildable from a checkpoint.
+
+  **What the evals caught, and what changed** (every edit anchored, verified by an
+  independent refuter node on Opus, and re-measured):
+
+  - `xstate` — 32/35 in both skill arms: every skill-loaded run drew a correct Mermaid
+    chart and left it in the chat, because the skill commanded a render without naming a
+    destination. Now the render is a file beside the machine, named in the reply, and the
+    completion check asks for that path. 35/35 in both arms on two consecutive runs
+    (no-skills 17–20/35).
+  - `front-end-testing` — 26–27/30 with the skill, level with no-skills: the reply never
+    said where its evidence stopped, a journey spec re-walked a component claim, an
+    ambiguous match was escaped by scoping to a CSS class, and one run module-mocked the
+    app's own API wrapper to fake an error. Now every hand-back names the harness and its
+    evidence boundary; one claim, one harness; ambiguity is resolved accessibly, never by
+    class or id; and the MSW rule covers the app's own request module on error paths too.
+    Forced arm 30/30 on runs 2 and 4; with-skills 30/30 when the skill routes.
+  - `react-testing` — 25/30 in both skill arms: a count line and a title span were found
+    by their planted test id because the skill never said how to find an element with no
+    role, and the child row was mocked when the request called it a dumb presenter
+    because the skill's only shallow-rendering warning was about enzyme. Now role-less
+    elements are found by their visible text and module-mocking a child is named as
+    shallow rendering by another name. 30/30 in both arms on two consecutive runs
+    (no-skills 21–22/30).
+  - `react-performance` — no skill edit needed: forced arm 20/20 on its first run, with
+    no-skills at 17/20 (no measurement before the first edit; two optimisation kinds in
+    one diff).
+  - `event-sourcing` — the first run scored 100% in every arm, no-skills included: once
+    the repository declares the ledger event sourced a capable model writes a decider, a
+    fold, an expected-version append and a projection unprompted, and the requests had
+    explained the practice on top. The decider case is gone, the requests carry business
+    facts instead of mechanism, and the suite now grades the four rules every arm had
+    skipped. Reworked suite: no-skills 18–19/23, forced 23/23 on two consecutive runs,
+    with-skills 20–22/23 — the skill needed no edit once the suite asked for what it
+    actually mandates.
+  - `tdd` (routing) — the batch-2 routing gaps became routing cases: with tdd's
+    description naming functional, refactoring, the declared architecture skills and now
+    front-end-testing/react-testing as companions, data-shaping requests, "collapse the
+    look-alikes", "tidy a module" and a browser bug report each route 3/3; tiered pricing
+    rules remain a 1/3 partial.
+
+  Harness changes: a generic evidence builder merges offline re-grades over a saved run;
+  graders across the batch accept any identifier casing, inline or named return types,
+  function or arrow declarations, point-free validators and any file split, after the
+  verifier showed name-anchored scans marking correct solutions down.
+
+## 4.14.0
+
+### Minor Changes
+
+- fe482a3: Add Warp's `skill-doctor` as a pinned external skill
+
+  Install `skill-doctor` from `warpdotdev/common-skills` at reviewed commit
+  `b811c24`. It scores recent local Claude Code, Codex, or Warp conversations for
+  efficiency, code quality, and skill coverage, then drafts evidence-backed skill
+  improvements and a local HTML report. Transcript and session data stay local.
+
+## 4.13.0
+
+### Minor Changes
+
+- 618665c: Evaluate skills with promptfoo, and fix the five skills the evals caught
+
+  Fifty skills with deliberately overlapping remits only work if each one loads when it
+  should and, once loaded, changes what the agent does. Until now both were checked by
+  reading and guessing. `evals/skills/` is a [promptfoo](https://github.com/promptfoo/promptfoo)
+  harness that measures both by running the real Claude Code agent (the Claude Agent SDK
+  provider) with this bundle mounted:
+
+  - **Routing** — 48 realistic developer requests that never name a skill, asserted with
+    `skill-used` / `not-skill-used` against the neighbour most likely to steal each one.
+  - **Quality** — for `tdd`, `hexagonal-architecture` and `domain-driven-design`, a small
+    fixture project that _declares_ the practice but shows as little of it as possible,
+    product asks the agent implements with write and shell access in a sandbox, and
+    deterministic graders that read the agent's tool-call trail (test edited before
+    production? failure observed?) and the workspace it left (inside imports only inside?
+    money in whole pence?), plus hidden acceptance tests for behaviour. Every case runs in
+    three arms — `with-skills`, `no-skills` (verified to see no skills, CLAUDE.md or
+    memory) and `skill-forced` — so forced-vs-none is what the skill body is worth and
+    with-vs-forced is whether the description routes on its own. Every grader and hidden
+    test was proven against a hand-written reference implementation before the first
+    agent run; `regrade.mjs` re-grades saved runs offline.
+
+  ```bash
+  cd evals/skills && pnpm install
+  ./run.sh                                             # routing, ~10 min
+  ./run-quality.sh tdd                                 # or hexagonal, ddd
+  SKILL_EVAL_BASELINE_REF=origin/main ./run-quality.sh tdd   # old vs new skill in one eval
+  ```
+
+  The suites are not part of `npm test`; `.github/workflows/skill-evals.yml` runs them on
+  demand, weekly, or on a PR labelled `run-evals`. Offline guards keep the wiring honest
+  on every push. `COVERAGE.md` tracks every skill's status and the batch plan;
+  `AUTHORING.md` is the brief for adding a suite.
+
+  **What the evals caught, and what changed** (every edit anchored, verified by an
+  independent refuter node, and re-measured):
+
+  - `tdd` — with the skill loaded, replies named the passing run but not the RED failure
+    and never stated the mutation-gate outcome; "it's probably a one-liner, please fix
+    it" never loaded the skill and no test was written. Now: the final reply names the
+    RED run and states the gate outcome in one line; the checklist item is unconditional;
+    the description fires on quick-fix bug reports. 34 → 44 of 44 (with-skills), 40 → 44
+    (forced), on two consecutive runs.
+  - `hexagonal-architecture` — with the skill force-loaded, agents still wrote a feature
+    as one file importing the SDKs, edited a tangled use case in place when asked to make
+    the next transport swap a one-file job, parked the adapter beside the vendor SDKs and
+    kept `vi.fn` mocks; the forced arm scored below no-skills. Now: a short "Before You
+    Write Code" procedure (an SDK client type is never a port; the order of work; what to
+    do when touching a use case that still imports an SDK; where adapters and fakes go;
+    fakes not mocks; porting every SDK dependency of a touched file is a REFACTOR step
+    before the RED, not scope creep), the port-method rule extended to vendor DTOs, and a
+    description that loads the skill for every change once a repo has opted in.
+    19 → 33 of 33 (with-skills), 14 → 33 (forced), on two consecutive runs.
+  - `domain-driven-design` — a derived branded value was re-branded with a second `as`,
+    tests were titled after helpers, and the request's word "fee" became a `Fee` type
+    although the glossary declares `Fine`. Now: one `as` per branded type inside its
+    factory and derived values go back through it; `describe`/`it` titles name the
+    business rule; the glossary outranks the request's wording. 21 → 22 of 22 (with-skills),
+    18 → 22 (forced), on two consecutive runs.
+  - `expectations` and `technical-writing` — descriptions that fired one and two times
+    in three on their own requests now use the words people actually say.
+
+  Known gap left for the next batch: `functional` lost a mutation-bug request to `tdd`
+  in one of two routing runs.
+
+- 63a85be: Skill evals batch 2: quality suites for seven skills, and the fixes they drove
+
+  Batch 2 of the programme tracked in `evals/skills/COVERAGE.md`. Each of `testing`,
+  `typescript-strict`, `functional`, `refactoring`, `mutation-testing`,
+  `characterisation-tests` and `finding-seams` now has a promptfoo quality suite built to
+  the `AUTHORING.md` bar: a fixture that declares the practice but shows none of it,
+  product-shaped requests that never name the practice, deterministic graders that quote
+  the rule they enforce, hidden acceptance tests, and a proof against a hand-written
+  reference implementation and a deliberate rule break before the first agent run. The
+  suites were authored by one graph node per skill and refuted by an independent
+  verifier, with a repair round.
+
+  Highlights of what the graders check:
+
+  - `testing` — fresh state per test, factories with overrides, the real production
+    schema reused, behaviour through the public interface, no mocks of the package's own
+    modules, no reflex 1:1 test-file mirroring, and that the tests catch planted mutants.
+  - `typescript-strict` — a schema parses the untrusted input before use and the type is
+    derived from it, no `any`, no assertions outside brand factories, one owner per
+    contract, exhaustive variant switches.
+  - `functional` — inputs are never written to (reachability from the parameter, plus a
+    frozen-input hidden test), array methods over loops, early returns, options objects.
+  - `refactoring` — a passing baseline is run before the first edit, behaviour including
+    the fixture's quirk is preserved, the two look-alike functions stay separate, no
+    commit is made, and the reply states a Critical/High/Nice/Skip assessment — including
+    "nothing worth doing" when that is the honest answer.
+  - `mutation-testing` — Stryker is configured with the vitest runner and actually run,
+    the reply reports killed/survived/score, and survivors drop below the fixture's
+    recorded baseline.
+  - `characterisation-tests` — no production file is touched, the agent's tests pass
+    against the unmodified module, and the quirk is pinned rather than "fixed".
+  - `finding-seams` — an explicit seam with a default that preserves both call sites, no
+    `vi.mock` of the module under test, fakes injected through the seam, the seam type
+    named in the reply.
+
+  **What the evals caught, and what changed** (every edit anchored, verified by an
+  independent refuter node on Opus, and re-measured; scores are with-skills / no-skills /
+  skill-forced):
+
+  - `testing` — 21/30 without the skill. With it, a touched test file's shared
+    `let`/`beforeEach` was left standing, factories were a matter of taste, planted
+    boundary and case-folding mutants survived, and factories used literals instead of
+    the production schema. Now: touching a test file makes its whole state discipline
+    yours; the factory trigger is mechanical; comparisons against constants and
+    normalising calls are enumerated before the first assertion; the production schema
+    is reused at the factory. Forced 30/30, with-skills 29/30.
+  - `mutation-testing` — 16/27 without. Crashed Stryker attempts silently consumed the
+    rerun budget, no survivor was ever called equivalent, and gate discipline was
+    optional. Now: a rerun budget that counts attempts, a cheap config proof before a
+    whole-project run, a triage table with an equivalence pass, no break threshold
+    before a recorded baseline, gitignore and scripts. 27/27 in both arms.
+  - `typescript-strict` — 25/31 without; the schema-at-boundary rule was already
+    landing (3/3 with the skill vs 1/3 without) but a value set with an owner was
+    re-spelled as a `z.enum` beside the hand-written union. Now: search for the owner,
+    derive from one `as const` list. Forced 31/31, with-skills 30/31.
+  - `functional` — 10/21 without → forced 21/21; but with routing left to the agent the
+    skill often does not load (tdd wins ordinary feature requests; with-skills 19/21),
+    and when a request asked to change a shared object in place even the forced arm
+    complied until the skill said otherwise. Now: the answer is still a new value and
+    the reply says why; readonly contracts; loop rules at the point of writing; a
+    description that names data-reshaping requests and loads alongside tdd.
+  - `refactoring` — 21/28 without → forced 28/28 (with-skills 25/28, one routing miss):
+    the reply never stated the Critical/High/Nice/Skip assessment and look-alike
+    functions were merged. Now: labelled lines plus a Decision line in every reply,
+    restated at the checkpoint that owns the reply; a baseline run even when declining;
+    keep semantically different look-alikes separate; the description fires on
+    "collapse" and "tidy".
+  - `characterisation-tests` — 20/29 without → forced 29/29, with-skills 28/29: the
+    oracle is observed by running the code before asserting, snapshot tests for large
+    text.
+  - `finding-seams` — 19/28 without → forced 28/28: a `??`/`||` fallback from a
+    parameter is an enabling point, never a module mock, only a hand-written fake goes
+    through the seam, and the hand-back names the seam type and where its enabling
+    point is.
+
+  Harness changes that came out of this batch: touched files are detected from git
+  status as well as the tool-call trail (tests written through a Bash heredoc count);
+  regrade rebuilds the exact run and honours the case's current vars; the skills mount
+  is a copy rather than a symlink, and the SDK sandbox allows local port binding, so
+  Stryker's own sandbox works inside the eval.
+
 ## 4.12.2
 
 ### Patch Changes

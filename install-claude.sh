@@ -62,6 +62,8 @@ IMPECCABLE_SKILLS_REPO="pbakaus/impeccable#5d10bc842cbccd2ae7d3a88296d87d3be0b12
 MATTPOCOCK_SKILLS_REPO="https://github.com/mattpocock/skills#84fdeffd12f2ee307994d1eb6feb48173b6e0502"
 MARKETING_SKILLS_REPO="coreyhaines31/marketingskills#7868cb9251fad80a73d26e488a5ad5f6c4a9f335"
 HERDR_SKILLS_REPO="herdrdev/herdr#1777e9bba32b953ed1ad203b4a16d01105539000"
+WARP_COMMON_SKILLS_REPO="warpdotdev/common-skills#b811c24365ae505bfc9646458957b886e29110b5"
+WARP_COMMON_SKILLS_SUBPATH=".agents/skills"
 # Anthropic's own skill-authoring skill: drafting, evals, benchmarking, and
 # description-trigger optimisation. Apache 2.0 (LICENSE.txt ships in the skill).
 ANTHROPIC_SKILLS_REPO="anthropics/skills#f17010c9bb483898c1d9c9f42dde2b3a98889434"
@@ -70,7 +72,8 @@ ANTHROPIC_SKILLS_SUBPATH="skills"
 FIRST_PARTY_SKILLS=(
   acceptance-review api-design bff-design bff-entry-points
   characterisation-tests ci-debugging cli-design codebase-design debugging
-  diagrams domain-driven-design double-check evaluate-existing-solutions
+  diagrams domain-driven-design double-check engineering-practice
+  evaluate-existing-solutions
   event-sourcing expectations find-gaps find-skills finding-seams
   folder-structure front-end-testing functional graph-engineering
   hexagonal-architecture
@@ -111,13 +114,16 @@ MATTPOCOCK_SKILLS=(grill-me writing-for-agents)
 SEO_AUDIT_SKILLS=(seo-audit)
 ANTHROPIC_SKILLS=(skill-creator)
 HERDR_SKILLS=(herdr)
+WARP_COMMON_SKILLS=(skill-doctor)
 COMMAND_FILES=(setup.md plan.md continue.md)
 AGENT_FILES=(
   tdd-guardian.md ts-enforcer.md refactor-scan.md docs-guardian.md adr.md
   learn.md use-case-data-patterns.md progress-guardian.md
   twelve-factor-audit.md
 )
-CLAUDE_AGENT_FILES=("${AGENT_FILES[@]}" README.md)
+# Reference notes that document the agents. They live outside agents/ because
+# Claude Code loads every .md under agents/ (recursively) as an agent type.
+AGENT_NOTE_FILES=(README.md use-case-data-patterns-source-notes.md)
 
 # Agents to target when installing skills via the pinned Skills CLI.
 # Built up from --agent/--with-opencode flags; default is claude-code only.
@@ -223,7 +229,7 @@ Options:
                        (use with --agent to target other agents only)
   --with-opencode      Shorthand for --agent opencode + install OpenCode config
   --opencode-only      Install only OpenCode config plus projected agents/commands (no Claude artifacts or skills)
-  --no-external        Skip all external community skills (web-quality-skills + Next.js skills + agent-skills + impeccable + grill-me + writing-for-agents + seo-audit + skill-creator + herdr)
+  --no-external        Skip all external community skills (web-quality-skills + Next.js skills + agent-skills + impeccable + grill-me + writing-for-agents + seo-audit + skill-creator + herdr + skill-doctor)
   --no-impeccable      Skip impeccable design skills only
   --no-ponytail        Skip the ponytail plugin (Claude Code + Codex)
   --version REF        Exact reviewed release tag or commit for first-party artifacts.
@@ -241,6 +247,7 @@ selects only the declared names from each source:
   coreyhaines31/marketingskills#7868cb9 --skill seo-audit
   anthropics/skills#f17010c --skill skill-creator
   herdrdev/herdr#1777e9b --skill herdr
+  warpdotdev/common-skills#b811c24 --skill skill-doctor
 
 Examples:
   # Install everything (recommended)
@@ -795,7 +802,7 @@ if [[ "$INSTALL_SKILLS" == true ]]; then
 
   install_manifest=("${FIRST_PARTY_SKILLS[@]}")
   if [[ "$INSTALL_EXTERNAL" == true ]]; then
-    install_manifest+=("${WEB_QUALITY_SKILLS[@]}" "${NEXT_SKILLS[@]}" "${VERCEL_REACT_SKILLS[@]}" "${MATTPOCOCK_SKILLS[@]}" "${SEO_AUDIT_SKILLS[@]}" "${ANTHROPIC_SKILLS[@]}" "${HERDR_SKILLS[@]}")
+    install_manifest+=("${WEB_QUALITY_SKILLS[@]}" "${NEXT_SKILLS[@]}" "${VERCEL_REACT_SKILLS[@]}" "${MATTPOCOCK_SKILLS[@]}" "${SEO_AUDIT_SKILLS[@]}" "${ANTHROPIC_SKILLS[@]}" "${HERDR_SKILLS[@]}" "${WARP_COMMON_SKILLS[@]}")
   fi
   if [[ "$INSTALL_IMPECCABLE" == true ]]; then
     install_manifest+=("${IMPECCABLE_SKILLS[@]}")
@@ -825,6 +832,7 @@ if [[ "$INSTALL_SKILLS" == true ]]; then
     # sibling agent without stealing focus. Installed for every target agent
     # because each one benefits from it independently.
     install_optional_skills_from "$HERDR_SKILLS_REPO" "herdr skill (herdrdev/herdr)" "" "${HERDR_SKILLS[@]}"
+    install_optional_skills_from "$WARP_COMMON_SKILLS_REPO" "skill-doctor skill (warpdotdev/common-skills)" "$WARP_COMMON_SKILLS_SUBPATH" "${WARP_COMMON_SKILLS[@]}"
   fi
 
   if [[ "$INSTALL_IMPECCABLE" == true ]]; then
@@ -868,11 +876,18 @@ fi
 if [[ "$INSTALL_AGENTS" == true ]]; then
   echo -e "${BLUE}Installing Claude Code agents...${NC}"
 
-  for agent in "${CLAUDE_AGENT_FILES[@]}"; do
+  for agent in "${AGENT_FILES[@]}"; do
     download_file \
       "$BASE_URL/$VERSION/claude/.claude/agents/$agent" \
       ~/.claude/agents/"$agent" \
       "agents/$agent"
+  done
+
+  for note in "${AGENT_NOTE_FILES[@]}"; do
+    download_file \
+      "$BASE_URL/$VERSION/claude/.claude/agent-notes/$note" \
+      ~/.claude/agent-notes/"$note" \
+      "agent-notes/$note"
   done
   echo ""
 fi
@@ -901,7 +916,7 @@ if [[ "$INSTALL_OPENCODE" == true ]]; then
       '/^allowed-tools:/d'
   done
 
-  # Project only real agent files (not README.md) from the pinned source.
+  # Project the agent files from the pinned source (notes live in agent-notes/).
   # OpenCode uses ~/.config/opencode/agent/ (singular) for agents
   # The 'tools' field expects an object in OpenCode but is a string in Claude Code
   # The 'color' field expects hex (#RRGGBB) in OpenCode but is a named color in Claude Code
@@ -942,6 +957,7 @@ if [[ "$INSTALL_SKILLS" == true ]]; then
     echo -e "     • mattpocock/skills — relentless plan interviewing + writing for agents"
     echo -e "     • anthropics/skills/skill-creator — authoring, evaluating, and tuning skills"
     echo -e "     • coreyhaines31/marketingskills/seo-audit — SEO audit workflow"
+    echo -e "     • warpdotdev/common-skills/skill-doctor — score recent local agent conversations and propose skill improvements"
   fi
   if [[ "$INSTALL_IMPECCABLE" == true ]]; then
     echo -e "     • pbakaus/impeccable — design vocabulary + steering commands"
@@ -958,7 +974,8 @@ if [[ "$INSTALL_COMMANDS" == true ]]; then
 fi
 
 if [[ "$INSTALL_AGENTS" == true ]]; then
-  echo -e "  ${GREEN}✓${NC} agents/ (9 Claude Code agents + README)"
+  echo -e "  ${GREEN}✓${NC} agents/ (9 Claude Code agents)"
+  echo -e "  ${GREEN}✓${NC} agent-notes/ (agent documentation, not loaded as agents)"
 fi
 
 if [[ "$INSTALL_OPENCODE" == true ]]; then
@@ -999,7 +1016,7 @@ fi
 
 if [[ "$INSTALL_AGENTS" == true ]]; then
   echo -e "  Learn about agents:"
-  echo -e "     ${YELLOW}cat ~/.claude/agents/README.md${NC}"
+  echo -e "     ${YELLOW}cat ~/.claude/agent-notes/README.md${NC}"
   echo ""
 fi
 
@@ -1058,6 +1075,9 @@ echo -e "    ${BLUE}https://github.com/anthropics/skills${NC} (Apache 2.0)"
 echo ""
 echo -e "  • ${YELLOW}Corey Haines${NC} — seo-audit marketing skill"
 echo -e "    ${BLUE}https://skills.sh/coreyhaines31/marketingskills/seo-audit${NC} (MIT)"
+echo ""
+echo -e "  • ${YELLOW}Warp${NC} — skill-doctor conversation-based skill evaluation"
+echo -e "    ${BLUE}https://www.warp.dev/skill-doctor${NC} (MIT)"
 echo ""
 echo -e "  • ${YELLOW}Kieran O'Hara${NC} — use-case-data-patterns agent"
 echo -e "    ${BLUE}https://github.com/kieran-ohara/dotfiles${NC}"

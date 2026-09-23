@@ -1,0 +1,21 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "conjurer-dotfiles",
+  "description": "Claude Code plugins published from the conjurer-rich dotfiles.",
+  "owner": {
+    "name": "conjurer-rich",
+    "url": "https://github.com/conjurer-rich"
+  },
+  "plugins": [
+    {
+      "name": "craft",
+      "description": "Engineering craft toolkit: TDD, TypeScript strictness, architecture, testing and review skills, agents and commands.",
+      "author": {
+        "name": "conjurer-rich"
+      },
+      "category": "development",
+      "source": "./claude/.claude",
+      "homepage": "https://github.com/conjurer-rich/.dotfiles"
+    }
+  ]
+}

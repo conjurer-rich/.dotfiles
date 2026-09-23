@@ -1,0 +1,13 @@
+{
+  "name": "craft",
+  "version": "4.12.2",
+  "description": "Engineering craft toolkit: TDD, TypeScript strictness, architecture, testing and review skills, agents and commands from the conjurer-rich dotfiles.",
+  "author": {
+    "name": "conjurer-rich",
+    "url": "https://github.com/conjurer-rich"
+  },
+  "homepage": "https://github.com/conjurer-rich/.dotfiles",
+  "repository": "https://github.com/conjurer-rich/.dotfiles",
+  "license": "SEE LICENSE IN LICENSE",
+  "keywords": ["tdd", "typescript", "architecture", "testing", "code-review"]
+}
