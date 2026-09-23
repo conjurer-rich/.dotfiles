@@ -66,6 +66,10 @@ require_text 'ready: timelineItems(itemTypes:[READY_FOR_REVIEW_EVENT]){ filtered
 require_text '`ready.filteredCount` is above 0' "Ready gates on the filtered count"
 reject_regex 'totalCount' "no gate reads the unfiltered timeline count"
 require_text 'never Ready' "a PR opened as non-draft is never landed"
+# The watcher may run on a machine that did not open the PR, so Review, not
+# just Land, must be able to create the worktree it needs.
+require_text 'If none exists (another machine or session opened the PR), `git fetch origin <head branch>`, then `git worktree add <path> <head branch>`' "Review creates a missing worktree"
+require_text 'Find or create the branch'"'"'s worktree as in **Review** step 2.' "Land reuses Review's worktree step"
 require_text 'holds no state between passes' "Watch keeps no local state"
 require_text 'about 270 seconds while any Land is waiting on CI' "Watch paces faster only while CI is pending"
 
