@@ -7,6 +7,10 @@
 # same gate as upstream's CLAUDE.md -- skipped by --help and by every mode flag
 # that sets INSTALL_CLAUDE=false.
 #
+# The wrapper also owns the fork's extra skills. Upstream's manifest names only
+# upstream's skills, so a skill added in this fork installs only if the wrapper
+# declares it.
+#
 
 set -e
 
@@ -47,8 +51,11 @@ esac
 exit 0
 STUB
 
-cat > "$TMPDIR/bin/npx" <<'STUB'
+NPX_LOG="$TMPDIR/npx.log"
+
+cat > "$TMPDIR/bin/npx" <<STUB
 #!/usr/bin/env bash
+echo "\$*" >> "$NPX_LOG"
 exit 0
 STUB
 
@@ -131,6 +138,26 @@ if ls "$HOME_DIR/.claude/CLAUDE.md.backup."* >/dev/null 2>&1; then
   pass "the replaced CLAUDE.md is backed up"
 else
   fail "an existing CLAUDE.md must be backed up before replacement"
+fi
+
+# --- 4. Every skill in this repository reaches the fork's install call -----
+new_case manifest
+: > "$NPX_LOG"
+set +e
+run_wrapper --skills-only --no-external --no-impeccable >/dev/null
+set -e
+
+FORK_CALL=$(grep -E 'add [^ ]*skills-src-conjurer-rich-\.dotfiles' "$NPX_LOG" || true)
+missing=""
+while IFS= read -r skill_file; do
+  skill_name=$(basename "$(dirname "$skill_file")")
+  [[ " $FORK_CALL " == *" $skill_name "* ]] || missing="$missing $skill_name"
+done < <(find "$REPO_ROOT/claude/.claude/skills" -mindepth 2 -maxdepth 2 -name SKILL.md -print)
+
+if [[ -n "$FORK_CALL" && -z "$missing" ]]; then
+  pass "the wrapper installs every skill in this repository"
+else
+  fail "the wrapper must install every skill in this repository; missing:${missing:- (no install call)}"
 fi
 
 echo ""

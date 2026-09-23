@@ -21,7 +21,7 @@ OVERLAY_DEST="$HOME/.claude/CLAUDE.md"
 
 # Skills owned by this fork rather than upstream. Space-separated: environment
 # variables cannot carry bash arrays.
-FORK_SKILLS=""
+FORK_SKILLS="browser-ux-walkthrough delegating-github-issues"
 
 BASE_URL="https://raw.githubusercontent.com/$FORK" \
 OWN_SKILLS_REPO_BASE="$FORK" \
