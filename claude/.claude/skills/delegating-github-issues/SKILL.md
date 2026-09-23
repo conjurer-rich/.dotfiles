@@ -103,6 +103,29 @@ A comment **needs an answer** when all four hold:
 6. Commit after approval; when **Watch** started this Review, commit without asking. Push, then reply on each actionable thread or top-level comment with one sentence naming the commit and what changed, ending with the delegator marker. Do not resolve threads; the reviewer resolves.
 7. Apply the Preview oracle rule if `oracle` is on. Report and stop.
 
+### Watch
+
+One pass over every open delegated PR, built to run under `/loop`. Watch holds no state between passes; everything it needs is on GitHub, so a restarted loop loses nothing.
+
+1. **Reclaim** as in **Work** step 2.
+2. `gh pr list --state open --search "head:<branch_prefix>" --limit 100 --json number,isDraft,headRefName,headRefOid,createdAt`. Keep only PRs whose `headRefName` starts with `<branch_prefix>`; the search is fuzzy.
+3. Classify each PR:
+   - **Needs review**: at least one review thread or top-level comment needs an answer (see **Delegator marker**), and the PR is a draft or `land` is off.
+   - **Ready**: `land` is on, `isDraft` is false, and the timeline holds a ready event:
+
+     ```bash
+     gh api graphql -F owner=<owner> -F repo=<repo> -F pr=<PR> -f query='
+     query($owner:String!,$repo:String!,$pr:Int!){
+       repository(owner:$owner,name:$repo){ pullRequest(number:$pr){
+         timelineItems(itemTypes:[READY_FOR_REVIEW_EVENT], last:1){ totalCount } } } }'
+     ```
+
+     A `totalCount` above 0 together with `isDraft` false means the human's latest click was Ready for review. A PR opened as non-draft has no such event and is never Ready.
+   - **Idle**: everything else. Never touched.
+4. Run **Review** on each Needs-review PR, committing without asking. Then run **Land** on each Ready PR. Work oldest `createdAt` first, one PR at a time.
+5. Report one line per PR: number, state, and the action taken or `idle`. Name idle non-draft PRs so the human sees them.
+6. Under `/loop`, schedule the next pass: about 270 seconds while any Land is waiting on CI, otherwise 1200–1800 seconds.
+
 ### Blocked
 
 Push whatever is staged as a draft PR: commit with subject `[blocked] <issue title> (#N)` after approval, `gh pr create --draft --title "[blocked] …" --body-file <file>` with the gate output in the **Verification** section, comment the PR URL on the issue with the one-line reason, and stop.

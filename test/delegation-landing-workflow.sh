@@ -56,6 +56,13 @@ require_text 'Merge a PR, except through **Land** with `land` on.' "merging is c
 require_text '`gh pr ready` runs only with `--undo`' "only the human marks a PR ready"
 reject_regex 'merge a PR, resolve a review thread' "the unconditional never-merge line is gone"
 
+# Task 2: Watch
+require_text '### Watch' "Watch entry point exists"
+require_text 'READY_FOR_REVIEW_EVENT' "Ready is read from the PR timeline"
+require_text 'never Ready' "a PR opened as non-draft is never landed"
+require_text 'holds no state between passes' "Watch keeps no local state"
+require_text 'about 270 seconds while any Land is waiting on CI' "Watch paces faster only while CI is pending"
+
 echo ""
 
 if [ "$FAILURES" -gt 0 ]; then
