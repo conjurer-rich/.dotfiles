@@ -80,7 +80,7 @@ A comment **needs an answer** when all four hold:
 ### Review `#PR`
 
 1. Confirm the PR head branch starts with `<branch_prefix>`; otherwise say this PR was not opened by a delegated run and stop.
-2. Find its worktree: `git worktree list --porcelain | grep -B2 'branch refs/heads/<head branch>'`. Enter it.
+2. Find its worktree: `git worktree list --porcelain | grep -B2 'branch refs/heads/<head branch>'`. If none exists (another machine or session opened the PR), `git fetch origin <head branch>`, then `git worktree add <path> <head branch>`, then bootstrap it the way the project's root CLAUDE.md says. Enter it.
 3. Fetch unresolved threads and top-level comments:
 
    ```bash
@@ -144,7 +144,7 @@ gh api repos/<owner>/<repo>/issues/<PR>/comments --paginate \
 When the SHA in it equals the PR's current `headRefOid`, Land already verified this head: after step 3, go to step 7.
 
 1. **Eligibility.** If `land` is off, say so and stop. The head branch must start with `<branch_prefix>`, and the PR must be **Ready** as **Watch** step 3 defines it; if not, say so and stop. Unless the land marker names the current head, `latest` in that query must be a `ReadyForReviewEvent`. A commit after the human's last Ready was not approved, so go to **Bail-out** with the reason `commits after Ready`.
-2. **Worktree.** Find the branch's worktree as in **Review** step 2. If none exists, `git fetch origin <branch>`, then `git worktree add <path> <branch>`, then bootstrap it the way the project's root CLAUDE.md says.
+2. **Worktree.** Find or create the branch's worktree as in **Review** step 2.
 3. **Open review first.** If any thread or top-level comment needs an answer, run **Review** steps 4–6, committing without asking. The human marked the PR ready with it open, so a clear request is a request to address. An ambiguous comment gets its single question and then **Bail-out** with the reason `question pending`.
 4. **Bring up to date.** `git fetch origin`, then `git merge --no-edit origin/<default branch>`. Resolve a conflict in place only when it is one of these textual kinds:
    - import order;
