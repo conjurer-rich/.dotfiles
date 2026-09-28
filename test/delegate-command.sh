@@ -53,6 +53,10 @@ require_text "$COMMAND" 'cat .claude/delegation.md' "the command reads the proje
 require_text "$COMMAND" 'is not set up here' "a project without settings stops instead of guessing"
 require_text "$COMMAND" 'gh repo view --json nameWithOwner' "owner and repo come from the repository"
 
+require_text "$COMMAND" 'No arguments, or `run` → one **Run** pass' "a bare /delegate runs one Run pass"
+require_text "$COMMAND" 'Run it as `/loop /delegate` to keep delegating' "the Run pass is built for /loop"
+require_text "$COMMAND" '**Run**, **Watch**, the **Work**' "a Run pass commits without asking"
+
 if grep -E '^!`[^`]*\bgh ' "$COMMAND" | grep -vq '||'; then
   fail "every gh line before the skill loads tolerates a missing gh"
 else

@@ -145,6 +145,12 @@ require_text 'wait for it to exit' "the implementer waits for the background sui
 require_text 'On every path out of this step except **Blocked**' "the UX walkthrough section is written with or without a repair"
 require_text 'the PR already exists, so **Blocked** does not apply' "a human-started Review never opens a second PR"
 
+# Run: one unattended pass of Watch then Pick and Work, built for /loop.
+require_text '### Run' "the skill has a Run entry point"
+require_text 'When **Run** started this Work, commit without asking' "Work under Run commits without asking"
+require_text 'skip Pick without commenting' "an over-budget Run pass never posts a paused comment"
+require_text 'a Run pass never waits on the human' "Run never blocks on a human answer"
+
 WALKTHROUGH="$REPO_ROOT/claude/.claude/skills/browser-ux-walkthrough/SKILL.md"
 if grep -Fq -- 'A caller that must not write production code' "$WALKTHROUGH"; then
   pass "the walkthrough lets a no-code caller skip its Fix step"

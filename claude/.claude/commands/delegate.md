@@ -1,6 +1,6 @@
 ---
-description: Work a labelled GitHub issue to a reviewable PR, pick the next one, address review comments, watch delegated PRs, or land a PR marked ready
-argument-hint: "#<issue> | next | review #<pr> | watch | land #<pr>"
+description: Keep delegating under /loop (watch delegated PRs, then pick and work the next issue), or work a labelled GitHub issue to a reviewable PR, pick the next one, address review comments, watch delegated PRs, or land a PR marked ready
+argument-hint: "[run] | #<issue> | next | review #<pr> | watch | land #<pr>"
 allowed-tools: Read, Glob, Grep, Bash(git:*), Bash(gh:*), Bash(pnpm:*), Bash(npm:*), Bash(npx:*), Bash(agent-browser:*), Bash(timeout:*), Agent, EnterWorktree
 ---
 
@@ -23,12 +23,13 @@ Otherwise the settings file's **Parameters** table sets the skill's parameters; 
 
 Parse `$ARGUMENTS`:
 
+- No arguments, or `run` → one **Run** pass: Watch, then Pick and Work. Run it as `/loop /delegate` to keep delegating until something needs the human.
 - `#<n>` or a bare number → **Work** issue `n`.
 - `next` → **Pick**, then **Work** the result.
 - `review #<n>` or `review <n>` → **Review** PR `n`.
 - `watch` → one **Watch** pass. Run it as `/loop /delegate watch` to keep watching.
 - `land #<n>` or `land <n>` → **Land** PR `n`.
-- Anything else → print the five forms above and stop.
+- Anything else → print the six forms above and stop.
 
 ## Procedure
 
@@ -36,7 +37,7 @@ Load the `delegating-github-issues` skill and follow the named entry point with 
 
 These rules apply in every project, alongside its Project rules:
 
-- Wait for commit approval before every commit in **Work** or **Review** started by hand. **Watch**, the **Review** and **Land** runs it starts, and `land #<n>` commit without asking.
+- Wait for commit approval before every commit in **Work** or **Review** started by hand. **Run**, **Watch**, the **Work**, **Review** and **Land** runs they start, and `land #<n>` commit without asking.
 - Commit trailer `Co-Authored-By: <the model running this delegation> <noreply@anthropic.com>`. Name the model that actually did the work, not a fixed one, or the attribution is false the first time a different model runs `/delegate`. PR footer `🤖 Generated with [Claude Code](https://claude.com/claude-code)`.
 
-The final line of the run is the PR URL, the merge SHA, the Watch pass report, or the one-line reason the run stopped.
+The final line of the run is the PR URL, the merge SHA, the Run or Watch pass report, or the one-line reason the run stopped.
