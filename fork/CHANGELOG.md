@@ -1,5 +1,11 @@
 # Changelog
 
+## 4.21.0
+
+### Minor Changes
+
+- 9f9cf20: `/delegate` with no arguments runs one **Run** pass of `delegating-github-issues`: Watch, then Pick and Work. Under `/loop /delegate` it keeps delegating until something needs the human. Work started by Run commits without asking, since the PR is the checkpoint. An over-budget pass skips Pick without commenting, and a pass never waits on a human answer.
+
 ## 4.20.0
 
 ### Minor Changes
