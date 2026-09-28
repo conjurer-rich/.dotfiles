@@ -1,6 +1,6 @@
 ---
 name: delegating-github-issues
-description: Take a triaged GitHub issue end-to-end to a reviewable pull request in an isolated worktree, then address review comments on request. With the land parameter on, also watch delegated PRs and review, simplify and merge one the human marked Ready for review. Use when a project command such as /delegate asks to pick up an issue, work a specific issue number, address review comments on a PR the delegator opened, watch delegated PRs, or land one. Not for triage, merging PRs the delegator did not open, or writing production code in the calling session.
+description: Take a triaged GitHub issue end-to-end to a reviewable pull request in an isolated worktree, then address review comments on request. With the land parameter on, also watch delegated PRs and review, simplify and merge one the human marked Ready for review. Use when a project command such as /delegate asks to pick up an issue, work a specific issue number, address review comments on a PR the delegator opened, watch delegated PRs, land one, or run one unattended pass that watches and then picks and works the next issue (for example under `/loop /delegate`). Not for triage, merging PRs the delegator did not open, or writing production code in the calling session.
 ---
 
 # Delegating GitHub issues
@@ -98,7 +98,7 @@ A comment **needs an answer** when all five hold:
    One round only. Any blocking finding that remains goes to **Blocked**, with the findings in the **Verification** section.
 
    On every path out of this step except **Blocked**, write the `## UX walkthrough` section from the final grades, or `Not applicable: no UI files changed` when the walkthrough did not run.
-10. **Commit.** Ask the human for commit approval with the proposed message shown. On approval, `git commit -F <file>` with a conventional-commit subject that names the issue (`fix(web): … (#N)`) and the project's co-author trailer.
+10. **Commit.** When **Run** started this Work, commit without asking: the PR is the checkpoint, and nothing merges before the human reviews it. Otherwise ask the human for commit approval with the proposed message shown. On approval, `git commit -F <file>` with a conventional-commit subject that names the issue (`fix(web): … (#N)`) and the project's co-author trailer.
 11. **Evidence.** If there are screenshots, push them per the project's evidence rule (for Flow Canvas: the `ux-evidence` orphan branch, path `<pr-number>/<surface>-<theme>-<before|after>.png`; the PR number is known only after step 12, so push evidence after the PR is created and then edit the body with `gh pr edit --body-file`).
 12. **PR.** `git push -u origin <branch>` then `gh pr create --title "<subject>" --body-file <file>`; add `--draft` when `land` is on, so that the human's Ready-for-review click is the landing signal. The body follows the contract below. Then comment `Opened <PR URL> for this issue.` on the issue, ending with the delegator marker: `gh issue comment N --body-file <file>`.
 13. **Oracle.** If `oracle` is on, wait up to 20 minutes polling every 2 minutes for the sticky comment and apply the Preview oracle rule. Otherwise say the check will run on the next `Review`.
@@ -159,6 +159,16 @@ One pass over every open delegated PR, built to run under `/loop`. Watch holds n
 5. Report one line per PR: number, state, and the action taken or `idle`. Name idle non-draft PRs so the human sees them.
 6. Under `/loop`, schedule the next pass 1200–1800 seconds out. Land's review and CI wait run in the background, and the background task that finishes wakes the loop, so a pass never polls to babysit them. To notice a Ready click or a new comment sooner, leave a background poll running between passes. It checks each delegated PR's draft state and unanswered comments, plus any new delegated PR, about once a minute, and exits on the first change.
 
+### Run
+
+One unattended pass: **Watch**, then **Pick** and **Work**. Built to run under `/loop`, so that one command keeps delegating until it needs the human. Like Watch, it holds no state between passes. Nobody answers prompts during a Run, so a Run pass never waits on the human: anything that needs an answer stays on GitHub for a later pass.
+
+1. **Watch.** Run **Watch** steps 1–4.
+2. **Budget.** Count as in **Work** step 2's **Count**. If either count is at its limit, skip Pick without commenting: the paused comment would repeat on every pass. Go to step 4.
+3. **Pick**, then **Work** the result, which commits without asking (**Work** step 10). When Work stops because the issue waits on the human (a question, or criteria awaiting a 👍), the pass goes on to step 4. A later pass picks the issue up once the human answers.
+4. **Report** Watch step 5's lines, then one line for the issue: its number and the outcome (the PR URL, `waiting on the human`, `blocked`, `over budget`, or `no eligible issue`).
+5. Under `/loop`, schedule the next pass as **Watch** step 6 does. The background poll also exits when a `<label>` issue is opened or gains a comment.
+
 ### Land `#PR`
 
 Review, simplify and merge a PR the human marked Ready for review. Land may merge only what the human approved plus changes that preserve behaviour. Anything else goes to **Bail-out**.
@@ -214,7 +224,7 @@ When the SHA in it equals the PR's current `headRefOid`, Land already verified t
 
 ### Blocked
 
-Push whatever is staged as a draft PR: commit with subject `[blocked] <issue title> (#N)` after approval, `gh pr create --draft --title "[blocked] …" --body-file <file>` with the gate output in the **Verification** section, comment the PR URL on the issue with the one-line reason, and stop.
+Push whatever is staged as a draft PR: commit with subject `[blocked] <issue title> (#N)` after approval (without asking when **Run** started this Work), `gh pr create --draft --title "[blocked] …" --body-file <file>` with the gate output in the **Verification** section, comment the PR URL on the issue with the one-line reason, and stop.
 
 ## Preview oracle rule
 
