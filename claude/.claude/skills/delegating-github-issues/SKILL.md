@@ -22,6 +22,7 @@ The calling command supplies these; defaults apply when it does not.
 | `walkthrough` | off | When on, run the `browser-ux-walkthrough` skill for diffs that touch the UI path the project names |
 | `oracle` | off | When on, apply the Preview oracle rule below |
 | `land` | off | When on, Work opens PRs as drafts, and **Land** may merge a PR the human marked Ready for review |
+| `claim_ttl` | 4 hours | A claim not renewed for this long lapses, and another session may take the issue or PR |
 
 ## Delegator marker
 
@@ -39,25 +40,62 @@ A comment **needs an answer** when all five hold:
 - it does not contain `<!-- preview-`;
 - it has not been answered. An inline comment is answered when a comment containing `<!-- delegator` or the Claude Code footer follows it in the same review thread. A top-level comment or review body is answered when a PR comment contains `<!-- delegator reply-to: <comment id> -->` with its id; Land's own status comments answer nothing.
 
+## Claims
+
+Several delegator sessions can run at once, and all post through the same `gh` login, so a session claims an issue (Work) or PR (Review, Land) with a comment before it changes anything, and the others leave a claimed item alone.
+
+**Session name.** Before its first claim, a session names itself with 8 random hex characters and uses that name for every claim it makes.
+
+**Claim.** If you already hold a live claim on the item, use it. Otherwise post one and keep its id:
+
+```bash
+gh api repos/<owner>/<repo>/issues/<n>/comments -f body='Claimed by delegator session `<session>` until released, or <claim_ttl> without renewal.
+<!-- delegator claim: <session> -->' --jq .id
+```
+
+Then list the live claims, the ones updated within `claim_ttl`:
+
+```bash
+gh api repos/<owner>/<repo>/issues/<n>/comments --paginate \
+  --jq '.[] | select((.body | contains("<!-- delegator claim: ")) and (now - (.updated_at | fromdateiso8601) < <claim_ttl in seconds>)) | {id, updated_at, body}'
+```
+
+The live claim with the lowest comment id wins, so two sessions that claim at the same moment agree on one winner. If it is not yours, delete your own claim comment (`gh api -X DELETE repos/<owner>/<repo>/issues/comments/<id>`): another session holds the item, and a human-started entry point says `#<n> is claimed by delegator session <session>` and stops.
+
+**Confirm.** Re-run the live-claims query and check that your claim is live and still wins. If not, the item is lost: stop without writing anything more to it, and report it as lost to the named session. Staged work stays in the worktree for the human. Confirm before any push, PR creation or merge.
+
+**Renew.** At the start of each numbered step of the entry point that claimed, confirm the claim, then rewrite its first line to end `renewed <UTC time>` (`gh api -X PATCH repos/<owner>/<repo>/issues/comments/<id> -f body='…'`). Confirming first matters: a lapsed claim keeps its low id, and renewing it blindly would take the item back from the session that claimed it since.
+
+**Release.** Every stop releases the claim. A stop that posted nothing else on the item deletes the claim comment; any other stop rewrites it as:
+
+```text
+Released by delegator session `<session>`: <the one-line reason the run stopped>.
+<!-- delegator claim-released: <session> -->
+```
+
+A Land waiting on a background task has not stopped, so its claim holds. A crashed or restarted session's claims lapse after `claim_ttl`; the human frees one sooner by deleting its comment. Review steps run inside Land use Land's claim.
+
 ## Entry points
 
 ### Pick
 
 1. `gh issue list --label <label> --state open --json number,title,labels,createdAt --limit 100`.
 2. Sort: issues with the first rank label, then the second, then unranked; oldest `createdAt` first within each group.
-3. Take the first issue that is not waiting on the human, as **Work** step 3 defines it. The list carries no comments, so read each candidate's with `gh issue view <n> --json body,comments` in sort order and stop at the first one that is not waiting. Continue at **Work** with that number.
-4. If the list is empty, or every issue is waiting, say so and stop. Do not widen the search.
+3. Take the first issue that is not waiting on the human, as **Work** step 3 defines it, and that no other session has taken. List the open delegated PRs once (`gh pr list --state open --limit 100 --json headRefName -q '.[].headRefName'`). Skip an issue that has an open PR from a `<branch_prefix><n>-` branch: it is already delegated. Then, in sort order, skip an issue another session holds a live claim on (the live-claims query in **Claims**) and one waiting on the human. The list carries no comments, so read each candidate's with `gh issue view <n> --json body,comments`. Continue at **Work** with the first issue left. If Work then loses the claim race for it, come back here and continue with the next candidate.
+4. If the list is empty, or every issue is skipped, say so, naming the claimed ones, and stop. Do not widen the search.
 
 ### Work `#N`
 
 1. **Eligibility.** `gh issue view N --json labels,body,title,state -q .` The issue must be open and carry `<label>`. If not, reply in chat "Issue #N is not labelled `<label>`; add the label to make it eligible" and stop.
 2. **Budget.** Reclaim finished worktrees first, then count.
 
-   **Reclaim.** For each worktree whose branch starts with `<branch_prefix>` (`git worktree list --porcelain`), read its PR: `gh pr list --head <branch> --state all --limit 1 --json number,state,headRefOid`. Reclaim it only when all three hold: the PR state is `MERGED`, `git -C <path> status --porcelain` prints nothing, and `git rev-parse <branch>` equals the PR's `headRefOid`. Do not test `git log origin/<default branch>..<branch>`: a squash merge leaves the branch's commits off the default branch, so that test never passes. Reclaim means `git worktree remove <path>`, then `git branch -d <branch>` (`-d`, never `-D`: it refuses anything unmerged and is the last safety net), then `git worktree prune`. If `-d` refuses because the squash merge left no ancestry, keep the branch and name it in the report. If the directory survives because another process holds it open (Windows: *"being used by another process"*; the usual culprit is a terminal parked inside it), the registration is already gone and the slot is free — delete what the platform's recursive delete will take, and name the leftover path in the run's report so the human can close whatever sits in it. Do not retry in a loop and do not kill processes to free it. Leave alone, and name in the report, any worktree whose PR is open, closed without merging, or missing, or which holds uncommitted or unpushed work.
+   **Reclaim.** For each worktree whose branch starts with `<branch_prefix>` (`git worktree list --porcelain`), read its PR: `gh pr list --head <branch> --state all --limit 1 --json number,state,headRefOid`. Reclaim it only when all three hold: the PR state is `MERGED`, `git -C <path> status --porcelain` prints nothing, and `git rev-parse <branch>` equals the PR's `headRefOid`. Do not test `git log origin/<default branch>..<branch>`: a squash merge leaves the branch's commits off the default branch, so that test never passes. Reclaim means `git worktree remove <path>`, then `git branch -d <branch>` (`-d`, never `-D`: it refuses anything unmerged and is the last safety net), then `git worktree prune`. If `-d` refuses because the squash merge left no ancestry, keep the branch and name it in the report. If the directory survives because another process holds it open (Windows: *"being used by another process"*; the usual culprit is a terminal parked inside it), the registration is already gone and the slot is free — delete what the platform's recursive delete will take, and name the leftover path in the run's report so the human can close whatever sits in it. Do not retry in a loop and do not kill processes to free it. If another session on the same machine reclaimed the worktree first, skip it. Leave alone, and name in the report, any worktree whose PR is open, closed without merging, or missing, or which holds uncommitted or unpushed work.
 
    **Count.** Delegated worktrees: `git worktree list --porcelain | grep -c 'branch refs/heads/<branch_prefix>'`. Open PRs: `gh pr list --state open --limit 100 --json number -q 'length'`. If either count is at its limit, post this issue comment and stop:
 
    > Delegation paused: <k> delegated worktrees active (limit <max_worktrees>) and <m> open PRs (limit <max_open_prs>). Retry when one closes.
+
+   **Claim.** Claim the issue as **Claims** describes. If another session holds it, or once claimed an open PR from a `<branch_prefix>N-` branch now exists (a session that just opened it has released its claim), stop; when Pick started this Work, return to Pick's next candidate instead. Every stop from here on releases the claim.
 
 3. **Acceptance criteria.** Read the body. Acceptance criteria are present if the body has a heading matching `/acceptance criteria/i` followed by a numbered or bulleted list. Use them for the rest of the run.
 
@@ -100,13 +138,13 @@ A comment **needs an answer** when all five hold:
    On every path out of this step except **Blocked**, write the `## UX walkthrough` section from the final grades, or `Not applicable: no UI files changed` when the walkthrough did not run.
 10. **Commit.** When **Run** started this Work, commit without asking: the PR is the checkpoint, and nothing merges before the human reviews it. Otherwise ask the human for commit approval with the proposed message shown. On approval, `git commit -F <file>` with a conventional-commit subject that names the issue (`fix(web): … (#N)`) and the project's co-author trailer.
 11. **Evidence.** If there are screenshots, push them per the project's evidence rule (for Flow Canvas: the `ux-evidence` orphan branch, path `<pr-number>/<surface>-<theme>-<before|after>.png`; the PR number is known only after step 12, so push evidence after the PR is created and then edit the body with `gh pr edit --body-file`).
-12. **PR.** `git push -u origin <branch>` then `gh pr create --title "<subject>" --body-file <file>`; add `--draft` when `land` is on, so that the human's Ready-for-review click is the landing signal. The body follows the contract below. Then comment `Opened <PR URL> for this issue.` on the issue, ending with the delegator marker: `gh issue comment N --body-file <file>`.
+12. **PR.** Confirm the claim is still yours (**Claims**), then `git push -u origin <branch>` then `gh pr create --title "<subject>" --body-file <file>`; add `--draft` when `land` is on, so that the human's Ready-for-review click is the landing signal. The body follows the contract below. Then comment `Opened <PR URL> for this issue.` on the issue, ending with the delegator marker: `gh issue comment N --body-file <file>`. Release the claim: from now on the open PR marks the issue as taken.
 13. **Oracle.** If `oracle` is on, wait up to 20 minutes polling every 2 minutes for the sticky comment and apply the Preview oracle rule. Otherwise say the check will run on the next `Review`.
 14. Report the PR URL and stop.
 
 ### Review `#PR`
 
-1. Confirm the PR head branch starts with `<branch_prefix>`; otherwise say this PR was not opened by a delegated run and stop.
+1. Confirm the PR head branch starts with `<branch_prefix>`; otherwise say this PR was not opened by a delegated run and stop. Then claim the PR (**Claims**); if another session holds it, stop.
 2. Find its worktree: `git worktree list --porcelain | grep -B2 'branch refs/heads/<head branch>'`. If none exists (another machine or session opened the PR), `git fetch origin <head branch>`, then `git worktree add <path> <head branch>`, then bootstrap it the way the project's root CLAUDE.md says. Enter it.
 3. Fetch unresolved threads and top-level comments:
 
@@ -132,16 +170,17 @@ A comment **needs an answer** when all five hold:
    A comment that asks for findings as follow-ups needs no code. File each finding as its own issue with the `follow-up` label and no `<label>`, with acceptance criteria. Add each issue to the PR body's `## Found on the way, not fixed here` section (`gh pr edit <PR> --body-file <file>`), then reply naming the issues. The body is where **Land** learns which findings are accepted.
 5. Hand the actionable threads to the implementer subagent (same brief shape as **Work** step 6, with the thread bodies and paths in place of the issue), then run **Work** steps 7–9. For the acceptance check, the contract is the actionable thread requests plus the PR body's acceptance criteria, which the fix must not break. Run the walkthrough only if `walkthrough` is on and UI files changed.
    When **Watch** or **Land** started this Review and the implementer cannot pass the gate, or a blocking finding survives the repair round, discard the staged changes (`git restore --staged --worktree .`), reply on each actionable thread or comment with the failure in one sentence, and stop; under Land, go to **Bail-out**. Never go to **Blocked** from **Watch** or **Land**. When the human started this Review, the PR already exists, so **Blocked** does not apply: keep the staged changes, post the remaining findings as one PR comment ending with the delegator marker, and stop.
-6. Commit after approval; when **Watch** or **Land** started this Review, commit without asking. Push, then reply on each actionable thread or top-level comment with one sentence naming the commit and what changed, ending with the delegator marker (the `reply-to` form for a top-level comment). Do not resolve threads; the reviewer resolves.
+6. Commit after approval; when **Watch** or **Land** started this Review, commit without asking. Confirm the claim is still yours, push, then reply on each actionable thread or top-level comment with one sentence naming the commit and what changed, ending with the delegator marker (the `reply-to` form for a top-level comment). Do not resolve threads; the reviewer resolves.
 7. Apply the Preview oracle rule if `oracle` is on. Report and stop.
 
 ### Watch
 
-One pass over every open delegated PR, built to run under `/loop`. Watch holds no state between passes; everything it needs is on GitHub, so a restarted loop loses nothing.
+One pass over every open delegated PR, built to run under `/loop`. Watch holds no state between passes beyond its session name; everything it needs is on GitHub, so a restarted loop loses nothing but waits out its old claims.
 
 1. **Reclaim** as in **Work** step 2.
 2. `gh pr list --state open --limit 100 --json number,isDraft,headRefName,headRefOid,createdAt --jq '[.[] | select(.headRefName | startswith("<branch_prefix>"))]'`.
 3. Classify each PR:
+   - **Claimed**: another session holds a live claim on it (**Claims**). Not touched this pass.
    - **Needs review**: at least one review thread, top-level comment or review body needs an answer (see **Delegator marker**), and the PR is a draft or `land` is off.
    - **Ready**: `land` is on and, from this query, `isDraft` is false and `ready.filteredCount` is above 0:
 
@@ -156,12 +195,12 @@ One pass over every open delegated PR, built to run under `/loop`. Watch holds n
      That is: the human marked it ready at least once and has not returned it to draft. A PR opened as non-draft has no ready event and is never Ready. `latest` tells Land whether a commit arrived after the last Ready.
    - **Idle**: everything else. Never touched.
 4. Run **Review** on each Needs-review PR, committing without asking. Then run **Land** on each Ready PR. Work oldest `createdAt` first, one PR at a time.
-5. Report one line per PR: number, state, and the action taken or `idle`. Name idle non-draft PRs so the human sees them.
-6. Under `/loop`, schedule the next pass 1200–1800 seconds out. Land's review and CI wait run in the background, and the background task that finishes wakes the loop, so a pass never polls to babysit them. To notice a Ready click or a new comment sooner, leave a background poll running between passes. It checks each delegated PR's draft state and unanswered comments, plus any new delegated PR, about once a minute, and exits on the first change.
+5. Report one line per PR: number, state, and the action taken, `claimed by <session>`, or `idle`. Name idle non-draft PRs so the human sees them.
+6. Under `/loop`, schedule the next pass 1200–1800 seconds out. Land's review and CI wait run in the background, and the background task that finishes wakes the loop, so a pass never polls to babysit them. To notice a Ready click or a new comment sooner, leave a background poll running between passes. It checks each delegated PR's draft state and unanswered comments, plus any new delegated PR, about once a minute, and exits on the first change. Comments that carry the delegator marker do not count as a change.
 
 ### Run
 
-One unattended pass: **Watch**, then **Pick** and **Work**. Built to run under `/loop`, so that one command keeps delegating until it needs the human. Like Watch, it holds no state between passes. Nobody answers prompts during a Run, so a Run pass never waits on the human: anything that needs an answer stays on GitHub for a later pass.
+One unattended pass: **Watch**, then **Pick** and **Work**. Built to run under `/loop`, so that one command keeps delegating until it needs the human. Like Watch, it holds no state between passes beyond its session name. Nobody answers prompts during a Run, so a Run pass never waits on the human: anything that needs an answer stays on GitHub for a later pass.
 
 1. **Watch.** Run **Watch** steps 1–4.
 2. **Budget.** Count as in **Work** step 2's **Count**. If either count is at its limit, skip Pick without commenting: the paused comment would repeat on every pass. Go to step 4.
@@ -182,7 +221,7 @@ gh api repos/<owner>/<repo>/issues/<PR>/comments --paginate \
 
 When the SHA in it equals the PR's current `headRefOid`, Land already verified this head: after step 3, go to step 7.
 
-1. **Eligibility.** If `land` is off, say so and stop. The head branch must start with `<branch_prefix>`, and the PR must be **Ready** as **Watch** step 3 defines it; if not, say so and stop. Unless the land marker names the current head, `latest` in that query must be a `ReadyForReviewEvent`. A commit after the human's last Ready was not approved, so go to **Bail-out** with the reason `commits after Ready`.
+1. **Eligibility.** If `land` is off, say so and stop. The head branch must start with `<branch_prefix>`; if not, say so and stop. Then claim the PR (**Claims**); if another session holds it, stop. The PR must be **Ready** as **Watch** step 3 defines it; if not, say so and stop. Unless the land marker names the current head, `latest` in that query must be a `ReadyForReviewEvent`. A commit after the human's last Ready was not approved, so go to **Bail-out** with the reason `commits after Ready`.
 2. **Worktree.** Find or create the branch's worktree as in **Review** step 2.
 3. **Open review first.** If any thread or top-level comment needs an answer, run **Review** steps 4–6, committing without asking. The human marked the PR ready with it open, so a clear request is a request to address. An ambiguous comment gets its single question and then **Bail-out** with the reason `question pending`.
 4. **Bring up to date.** `git fetch origin`, then `git merge --no-edit origin/<default branch>`. Resolve a conflict in place only when it is one of these textual kinds:
@@ -198,13 +237,13 @@ When the SHA in it equals the PR's current `headRefOid`, Land already verified t
    > Work only inside `<worktree path>`. Run `/code-review` at medium effort and `/simplify` on the diff against `origin/<default branch>`. Apply only changes that preserve behaviour; do not change any test's assertions. Do not fix anything that needs a behaviour change: return it instead. Findings listed under the PR body's `## Found on the way, not fixed here` are accepted: name them as accepted, with their issue numbers, and do not return them. Run the project's pre-push self-check. If you changed production files, run the project's mutation gate scoped to those files and revert any simplification that lowers the covered score. Do not commit; leave the changes staged. Return: (a) the files changed, (b) every finding that needs a behaviour change, with file and line, (c) the verification commands and their last ten lines, (d) the mutation outcome or `N/A` with the reason.
 
    If (b) is not empty, or the pre-push self-check fails, go to **Bail-out** and list the findings. If test files changed, run the project's `tdd-guardian` agent on the staged diff; any finding goes to **Bail-out**.
-6. **Commit and push.** Commit without asking. Step 4's merge is one commit: git made it already when there was no conflict; after resolving a conflict, commit it with the project's co-author trailer. Commit step 5's changes, when there are any, as `refactor: simplify after review (#PR)` with the trailer. Then `git push`, with no force flag. Post a PR comment whose body is `Reviewed <sha> for landing.`, followed by the line `<!-- delegator land: reviewed <sha> -->` and the delegator marker, where `<sha>` is the new `headRefOid`.
+6. **Commit and push.** Commit without asking. Step 4's merge is one commit: git made it already when there was no conflict; after resolving a conflict, commit it with the project's co-author trailer. Commit step 5's changes, when there are any, as `refactor: simplify after review (#PR)` with the trailer. Confirm the claim is still yours, then `git push`, with no force flag. Post a PR comment whose body is `Reviewed <sha> for landing.`, followed by the line `<!-- delegator land: reviewed <sha> -->` and the delegator marker, where `<sha>` is the new `headRefOid`.
 7. **Wait for CI.** Run `timeout 2400 gh pr checks <PR> --watch --fail-fast` as a background task. Its exit resumes this Land; then read `gh pr checks <PR>`.
    - A failing check: **Bail-out**, naming the check and the last lines of `gh run view <run> --log-failed`.
    - Still pending when the wait times out, or the session restarted mid-wait: leave the PR as it is. The next Watch pass resumes at this step through the land marker.
    - `no checks reported`: continue only when every changed path is one the project's CI ignores (for Flow Canvas, `docs/**`, `**/*.md`, `.claude/**`); otherwise wait as for pending.
    - Preview E2E is a merge gate only when `oracle` is on, and then by the Preview oracle rule.
-8. **Merge.** Check `isDraft` again (`gh pr view <PR> --json isDraft,headRefOid`) and re-read the comments as in **Review** step 3. If the PR is now a draft, its head is no longer the verified SHA, or a comment needs an answer, stop without merging. The next Watch pass picks it up. Otherwise run `gh pr merge <PR> --squash --match-head-commit <verified SHA>`. If `gh pr merge` exits non-zero, go to **Bail-out** with its error output.
+8. **Merge.** Check `isDraft` again (`gh pr view <PR> --json isDraft,headRefOid`) and re-read the comments as in **Review** step 3. If the PR is now a draft, its head is no longer the verified SHA, or a comment needs an answer, stop without merging. The next Watch pass picks it up. Otherwise confirm the claim is still yours and run `gh pr merge <PR> --squash --match-head-commit <verified SHA>`. If `gh pr merge` exits non-zero, go to **Bail-out** with its error output.
 9. **After merge.** Reclaim this worktree at once under **Work** step 2's Reclaim rules. Comment `Merged in <merge sha> via Land.` on the PR and `Landed in <PR URL>.` on the issue, each ending with the delegator marker. Report the merge SHA and stop.
 
 #### Bail-out
@@ -259,6 +298,7 @@ Use these eight headings, in this order, every time. A section that does not app
 - Mark a PR ready for review. `gh pr ready` runs only with `--undo`; only the human marks a PR ready.
 - Remove a worktree whose PR has not merged, or delete any branch other than the local `<branch_prefix>` branch of a worktree being reclaimed — and that one only with `git branch -d`.
 - Kill a process to free a worktree directory; report the leftover path instead.
+- Edit or delete another session's claim. A session touches only its own claim comments.
 - Run the full test suite at the repository root in the foreground, or to check a single change.
 - Point a browser at a deployed preview URL.
 - Continue after an ambiguous review comment without the human's answer.
