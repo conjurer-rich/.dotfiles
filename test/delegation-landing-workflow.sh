@@ -151,6 +151,35 @@ require_text 'When **Run** started this Work, commit without asking' "Work under
 require_text 'skip Pick without commenting' "an over-budget Run pass never posts a paused comment"
 require_text 'a Run pass never waits on the human' "Run never blocks on a human answer"
 
+# Several sessions run /loop /delegate at once through one gh login, so
+# assignees and labels cannot tell them apart. A claim comment names the
+# session; the lowest live comment id settles a race; a lease lets a crashed
+# session's claim lapse instead of locking the issue for good.
+require_text '| `claim_ttl` | 4 hours |' "claims lapse after a default lease"
+require_text '<!-- delegator claim: <session> -->' "a claim names the session holding it"
+require_text 'live claim with the lowest comment id wins' "a race between two sessions has one winner"
+require_text 'delete your own claim comment' "the losing session withdraws its claim"
+require_text 'Every stop releases the claim' "a session releases its claim on every exit"
+require_text '<!-- delegator claim-released: <session> -->' "a released claim stays readable on the issue"
+require_text 'Skip an issue that has an open PR from a `<branch_prefix><n>-` branch' "Pick never re-picks an issue that already has a PR"
+require_text 'skip an issue another session holds a live claim on' "Pick skips issues another session claimed"
+require_text 'otherwise say this PR was not opened by a delegated run and stop. Then claim the PR (**Claims**)' "Review claims the PR before touching it"
+require_text 'say so and stop. Then claim the PR (**Claims**); if another session holds it, stop. The PR must be **Ready**' "Land claims the PR before it can bail out"
+require_text 'Confirm before any push, PR creation or merge.' "a session that lost its claim writes nothing more"
+require_text 'Confirm the claim is still yours (**Claims**), then `git push -u origin <branch>`' "Work confirms its claim before pushing"
+require_text 'Confirm the claim is still yours, push, then reply' "Review confirms its claim before pushing"
+require_text 'Confirm the claim is still yours, then `git push`, with no force flag' "Land confirms its claim before pushing"
+require_text 'Otherwise confirm the claim is still yours and run `gh pr merge <PR>' "Land confirms its claim before merging"
+# Review of the first draft: a lapsed claim keeps its low id, so renewing it
+# blindly steals the item back; and a session that released on opening its PR
+# left a window for another session to claim the issue again.
+require_text 'confirm the claim, then rewrite its first line' "renewal never revives a lapsed claim"
+require_text 'If you already hold a live claim on the item, use it.' "a session never claims the same item twice"
+require_text 'once claimed an open PR from a `<branch_prefix>N-` branch now exists' "a claim won just after another session opened its PR stops"
+require_text 'A stop that posted nothing else on the item deletes the claim comment' "a waiting issue is still left without new comments"
+require_text 'Comments that carry the delegator marker do not count as a change' "one session's claims do not wake every other session's poll"
+require_text 'Edit or delete another session'"'"'s claim' "the Never list protects other sessions' claims"
+
 WALKTHROUGH="$REPO_ROOT/claude/.claude/skills/browser-ux-walkthrough/SKILL.md"
 if grep -Fq -- 'A caller that must not write production code' "$WALKTHROUGH"; then
   pass "the walkthrough lets a no-code caller skip its Fix step"

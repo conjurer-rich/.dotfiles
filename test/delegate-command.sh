@@ -56,6 +56,7 @@ require_text "$COMMAND" 'gh repo view --json nameWithOwner' "owner and repo come
 require_text "$COMMAND" 'No arguments, or `run` → one **Run** pass' "a bare /delegate runs one Run pass"
 require_text "$COMMAND" 'Run it as `/loop /delegate` to keep delegating' "the Run pass is built for /loop"
 require_text "$COMMAND" '**Run**, **Watch**, the **Work**' "a Run pass commits without asking"
+require_text "$COMMAND" 'Several sessions can run `/loop /delegate` at once' "the command says parallel sessions are supported"
 
 if grep -E '^!`[^`]*\bgh ' "$COMMAND" | grep -vq '||'; then
   fail "every gh line before the skill loads tolerates a missing gh"

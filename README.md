@@ -1462,7 +1462,7 @@ Four slash commands that encode common workflows into single invocations:
 | **`/setup`** | Authorized project onboarding — detect tech stack, create project guidance, hooks, and commands | Only when the user explicitly requests onboarding/config generation |
 | **`/plan`** | Create a plan document on a branch with a PR — no code changes | When planning work before implementation |
 | **`/continue`** | Continue after a merged independent PR or advance/sync a stack | Moving to the next slice or dependent layer |
-| **`/delegate`** | Delegate GitHub issues through the `delegating-github-issues` skill: `/loop /delegate` watches delegated PRs, then picks and works the next issue on every pass | In a project with a `.claude/delegation.md` settings file |
+| **`/delegate`** | Delegate GitHub issues through the `delegating-github-issues` skill: `/loop /delegate` watches delegated PRs, then picks and works the next issue on every pass. Several sessions can run at once; each claims an issue or PR with a comment so the others skip it | In a project with a `.claude/delegation.md` settings file |
 
 PR review is not a command: the [`panel-review` skill](claude/.claude/skills/panel-review/SKILL.md) provides `/panel-review`, and PR creation is ordinary agent-led work gated by that skill's PR-readiness reference.
 
