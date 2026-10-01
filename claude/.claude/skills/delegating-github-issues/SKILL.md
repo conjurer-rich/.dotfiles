@@ -23,6 +23,7 @@ The calling command supplies these; defaults apply when it does not.
 | `oracle` | off | When on, apply the Preview oracle rule below |
 | `land` | off | When on, Work opens PRs as drafts, and **Land** may merge a PR the human marked Ready for review |
 | `claim_ttl` | 4 hours | A claim not renewed for this long lapses, and another session may take the issue or PR |
+| `progress_label` | `in-progress` | Carried by an issue or PR while a delegator session holds a live claim on it, so a human sees at a glance that an agent is working on it |
 
 ## Delegator marker
 
@@ -44,7 +45,11 @@ A comment **needs an answer** when all five hold:
 
 Several delegator sessions can run at once, and all post through the same `gh` login, so a session claims an issue (Work) or PR (Review, Land) with a comment before it changes anything, and the others leave a claimed item alone.
 
+The claim comment is the lock. The `<progress_label>` label is the signal for humans: a session adds it when its claim wins and removes it when it releases, so the issue list shows what an agent is working on without anyone opening the comments. The label never decides anything: a crashed session leaves its label behind, and only the live-claims query below says whether a claim is live.
+
 **Session name.** Before its first claim, a session names itself with 8 random hex characters and uses that name for every claim it makes.
+
+**Label.** Before its first claim, a session makes sure the repository has the label. `gh label list --search <progress_label> --json name --jq '.[] | select(.name == "<progress_label>") | .name'` prints nothing when it is missing; then `gh label create <progress_label> --color FBCA04 --description 'A delegator session is working on this'`. Never `--force`: an existing label keeps the colour and description the human gave it.
 
 **Claim.** If you already hold a live claim on the item, use it. Otherwise post one and keep its id:
 
@@ -60,20 +65,28 @@ gh api repos/<owner>/<repo>/issues/<n>/comments --paginate \
   --jq '.[] | select((.body | contains("<!-- delegator claim: ")) and (now - (.updated_at | fromdateiso8601) < <claim_ttl in seconds>)) | {id, updated_at, body}'
 ```
 
-The live claim with the lowest comment id wins, so two sessions that claim at the same moment agree on one winner. If it is not yours, delete your own claim comment (`gh api -X DELETE repos/<owner>/<repo>/issues/comments/<id>`): another session holds the item, and a human-started entry point says `#<n> is claimed by delegator session <session>` and stops.
+The live claim with the lowest comment id wins, so two sessions that claim at the same moment agree on one winner. If it is not yours, delete your own claim comment (`gh api -X DELETE repos/<owner>/<repo>/issues/comments/<id>`): another session holds the item, and a human-started entry point says `#<n> is claimed by delegator session <session>` and stops. If it is yours, add the label:
+
+```bash
+gh api -X POST repos/<owner>/<repo>/issues/<n>/labels -f 'labels[]=<progress_label>'
+```
+
+This endpoint takes issues and PRs alike, and adding a label the item already carries is a no-op.
 
 **Confirm.** Re-run the live-claims query and check that your claim is live and still wins. If not, the item is lost: stop without writing anything more to it, and report it as lost to the named session. Staged work stays in the worktree for the human. Confirm before any push, PR creation or merge.
 
 **Renew.** At the start of each numbered step of the entry point that claimed, confirm the claim, then rewrite its first line to end `renewed <UTC time>` (`gh api -X PATCH repos/<owner>/<repo>/issues/comments/<id> -f body='…'`). Confirming first matters: a lapsed claim keeps its low id, and renewing it blindly would take the item back from the session that claimed it since.
 
-**Release.** Every stop releases the claim. A stop that posted nothing else on the item deletes the claim comment; any other stop rewrites it as:
+**Release.** Every stop releases the claim. First remove the label (`gh api -X DELETE repos/<owner>/<repo>/issues/<n>/labels/<progress_label>`; a 404 means it was already gone). A stop that posted nothing else on the item deletes the claim comment; any other stop rewrites it as:
 
 ```text
 Released by delegator session `<session>`: <the one-line reason the run stopped>.
 <!-- delegator claim-released: <session> -->
 ```
 
-A Land waiting on a background task has not stopped, so its claim holds. A crashed or restarted session's claims lapse after `claim_ttl`; the human frees one sooner by deleting its comment. Review steps run inside Land use Land's claim.
+A Land waiting on a background task has not stopped, so its claim and its label hold. A crashed or restarted session's claims lapse after `claim_ttl`; the human frees one sooner by deleting its comment. Its label does not lapse: **Stale label** below removes it. Review steps run inside Land use Land's claim.
+
+**Stale label.** An item that carries `<progress_label>` with no live claim was left by a session that crashed or was restarted. Any session that finds one while classifying (Pick step 3, Watch step 3) removes the label, with the same command Release uses, and then treats the item as free. The label is not a claim, so this does not touch another session's claim comment.
 
 ## Entry points
 
@@ -81,7 +94,7 @@ A Land waiting on a background task has not stopped, so its claim holds. A crash
 
 1. `gh issue list --label <label> --state open --json number,title,labels,createdAt --limit 100`.
 2. Sort: issues with the first rank label, then the second, then unranked; oldest `createdAt` first within each group.
-3. Take the first issue that is not waiting on the human, as **Work** step 3 defines it, and that no other session has taken. List the open delegated PRs once (`gh pr list --state open --limit 100 --json headRefName -q '.[].headRefName'`). Skip an issue that has an open PR from a `<branch_prefix><n>-` branch: it is already delegated. Then, in sort order, skip an issue another session holds a live claim on (the live-claims query in **Claims**) and one waiting on the human. The list carries no comments, so read each candidate's with `gh issue view <n> --json body,comments`. Continue at **Work** with the first issue left. If Work then loses the claim race for it, come back here and continue with the next candidate.
+3. Take the first issue that is not waiting on the human, as **Work** step 3 defines it, and that no other session has taken. List the open delegated PRs once (`gh pr list --state open --limit 100 --json headRefName -q '.[].headRefName'`). Skip an issue that has an open PR from a `<branch_prefix><n>-` branch: it is already delegated. Then, in sort order, skip an issue another session holds a live claim on (the live-claims query in **Claims**) and one waiting on the human. An issue that carries `<progress_label>` but has no live claim is free: remove the label as **Stale label** in **Claims** says, and keep it as a candidate. The list carries no comments, so read each candidate's with `gh issue view <n> --json body,comments`. Continue at **Work** with the first issue left. If Work then loses the claim race for it, come back here and continue with the next candidate.
 4. If the list is empty, or every issue is skipped, say so, naming the claimed ones, and stop. Do not widen the search.
 
 ### Work `#N`
@@ -138,7 +151,7 @@ A Land waiting on a background task has not stopped, so its claim holds. A crash
    On every path out of this step except **Blocked**, write the `## UX walkthrough` section from the final grades, or `Not applicable: no UI files changed` when the walkthrough did not run.
 10. **Commit.** When **Run** started this Work, commit without asking: the PR is the checkpoint, and nothing merges before the human reviews it. Otherwise ask the human for commit approval with the proposed message shown. On approval, `git commit -F <file>` with a conventional-commit subject that names the issue (`fix(web): … (#N)`) and the project's co-author trailer.
 11. **Evidence.** If there are screenshots, push them per the project's evidence rule (for Flow Canvas: the `ux-evidence` orphan branch, path `<pr-number>/<surface>-<theme>-<before|after>.png`; the PR number is known only after step 12, so push evidence after the PR is created and then edit the body with `gh pr edit --body-file`).
-12. **PR.** Confirm the claim is still yours (**Claims**), then `git push -u origin <branch>` then `gh pr create --title "<subject>" --body-file <file>`; add `--draft` when `land` is on, so that the human's Ready-for-review click is the landing signal. The body follows the contract below. Then comment `Opened <PR URL> for this issue.` on the issue, ending with the delegator marker: `gh issue comment N --body-file <file>`. Release the claim: from now on the open PR marks the issue as taken.
+12. **PR.** Confirm the claim is still yours (**Claims**), then `git push -u origin <branch>` then `gh pr create --title "<subject>" --body-file <file>`; add `--draft` when `land` is on, so that the human's Ready-for-review click is the landing signal. The body follows the contract below. Then comment `Opened <PR URL> for this issue.` on the issue, ending with the delegator marker: `gh issue comment N --body-file <file>`. Release the claim, which takes `<progress_label>` off the issue: from now on the open PR marks the issue as taken.
 13. **Oracle.** If `oracle` is on, wait up to 20 minutes polling every 2 minutes for the sticky comment and apply the Preview oracle rule. Otherwise say the check will run on the next `Review`.
 14. Report the PR URL and stop.
 
@@ -178,9 +191,9 @@ A Land waiting on a background task has not stopped, so its claim holds. A crash
 One pass over every open delegated PR, built to run under `/loop`. Watch holds no state between passes beyond its session name; everything it needs is on GitHub, so a restarted loop loses nothing but waits out its old claims.
 
 1. **Reclaim** as in **Work** step 2.
-2. `gh pr list --state open --limit 100 --json number,isDraft,headRefName,headRefOid,createdAt --jq '[.[] | select(.headRefName | startswith("<branch_prefix>"))]'`.
+2. `gh pr list --state open --limit 100 --json number,isDraft,headRefName,headRefOid,createdAt,labels --jq '[.[] | select(.headRefName | startswith("<branch_prefix>"))]'`.
 3. Classify each PR:
-   - **Claimed**: another session holds a live claim on it (**Claims**). Not touched this pass.
+   - **Claimed**: another session holds a live claim on it (**Claims**). Not touched this pass. A PR that carries `<progress_label>` with no live claim is not Claimed: remove the label as **Stale label** says, then classify it below.
    - **Needs review**: at least one review thread, top-level comment or review body needs an answer (see **Delegator marker**), and the PR is a draft or `land` is off.
    - **Ready**: `land` is on and, from this query, `isDraft` is false and `ready.filteredCount` is above 0:
 
@@ -299,6 +312,7 @@ Use these eight headings, in this order, every time. A section that does not app
 - Remove a worktree whose PR has not merged, or delete any branch other than the local `<branch_prefix>` branch of a worktree being reclaimed — and that one only with `git branch -d`.
 - Kill a process to free a worktree directory; report the leftover path instead.
 - Edit or delete another session's claim. A session touches only its own claim comments.
+- Put `<progress_label>` on an item without holding a live claim on it, or leave it on one you released. The label says an agent is working on the item now, and a wrong one sends the human to look at nothing.
 - Run the full test suite at the repository root in the foreground, or to check a single change.
 - Point a browser at a deployed preview URL.
 - Continue after an ambiguous review comment without the human's answer.
