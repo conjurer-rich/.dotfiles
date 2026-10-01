@@ -127,7 +127,7 @@ require_text 'The implementer'"'"'s returns are claims, not evidence.' "the impl
 require_text 'loads `acceptance-review`' "acceptance criteria are checked independently"
 require_text 'The project'"'"'s whole-PR review agent' "the whole diff is reviewed before the PR opens"
 require_text 'do **not** run its Fix step' "the delegator never applies walkthrough fixes itself"
-require_text 'Then re-run `tdd-guardian` and every check that reported a blocking finding.' "the repair round is re-checked"
+require_text 'Then re-run `tdd-guardian` and every check that reported a blocking finding, as step 7 dispatches them.' "the repair round is re-checked"
 require_text 'edit this comment to change them, then react' "derived acceptance criteria wait for the human"
 require_text 'including any glossary or vocabulary check' "the gate's glossary step is not dropped"
 reject_regex 'gate'"'"'s steps 1–5' "the pre-PR gate is not truncated"
@@ -166,9 +166,10 @@ require_text 'skip an issue another session holds a live claim on' "Pick skips i
 require_text 'otherwise say this PR was not opened by a delegated run and stop. Then claim the PR (**Claims**)' "Review claims the PR before touching it"
 require_text 'say so and stop. Then claim the PR (**Claims**); if another session holds it, stop. The PR must be **Ready**' "Land claims the PR before it can bail out"
 require_text 'Confirm before any push, PR creation or merge.' "a session that lost its claim writes nothing more"
-require_text 'Confirm the claim is still yours (**Claims**), then `git push -u origin <branch>`' "Work confirms its claim before pushing"
-require_text 'Confirm the claim is still yours, push, then reply' "Review confirms its claim before pushing"
-require_text 'Confirm the claim is still yours, then `git push`, with no force flag' "Land confirms its claim before pushing"
+require_text 'Confirm the claim is still yours (**Claims**) before dispatching, and renew it. The ship subagent then runs `git push -u origin <branch>`' "Work confirms its claim before the ship subagent pushes"
+require_text 'Confirm the claim is still yours, then dispatch the ship subagent (**Work** step 10'"'"'s brief without PR creation: it commits from the message file and pushes with no force flag' "Review confirms its claim before the ship subagent pushes"
+require_text 'then `git push`, with no force flag; it returns the new head SHA' "Land's ship subagent pushes with no force flag"
+require_text 'Confirm the claim is still yours, then dispatch the ship subagent (**Work** step 10'"'"'s brief without PR creation): step 4'"'"'s merge' "Land confirms its claim before the ship subagent pushes"
 require_text 'Otherwise confirm the claim is still yours and run `gh pr merge <PR>' "Land confirms its claim before merging"
 # Review of the first draft: a lapsed claim keeps its low id, so renewing it
 # blindly steals the item back; and a session that released on opening its PR
@@ -194,6 +195,68 @@ require_text '**Stale label.**' "a crashed session's label is cleaned up"
 require_text 'remove the label as **Stale label** in **Claims** says, and keep it as a candidate' "Pick does not skip an issue on a stale label"
 require_text 'with no live claim is not Claimed' "Watch does not skip a PR on a stale label"
 require_text 'Put `<progress_label>` on an item without holding a live claim on it' "the Never list forbids a label without a claim"
+
+# A /loop /delegate run in a cloud container worked three issues at once and
+# used the delegator's whole context in one pass: EnterWorktree pinned it to one
+# worktree so every other git command was refused by the isolation guard, the
+# browser walkthrough and the commit/push/PR steps ran inline, claims
+# bookkeeping was thirty gh calls in the main context, every subagent report
+# came back in full, Pick re-read every skipped issue on every pass, and nothing
+# told the run to stop. Each guard below pins one of the fixes.
+# A. The delegator never enters a worktree.
+reject_regex 'EnterWorktree' "the skill no longer uses EnterWorktree"
+require_text 'git worktree add <path> -b <branch_prefix>N-<slug> origin/<default branch>' "the worktree is created from the main checkout"
+require_text 'Stay in the main checkout: the delegator never enters the worktree' "the delegator stays in the main checkout"
+require_text 'It runs no `git` command inside a worktree other than `git worktree add`, `git worktree list`, `git worktree remove`, `git worktree prune` and `git -C <path> status --porcelain` for Reclaim.' "the delegator's in-worktree git commands are the five Reclaim ones"
+require_text 'then dispatch the bootstrap subagent as **Work** step 5 does. Never enter it' "Review never enters the worktree either"
+require_text 'work only inside `<path>`' "subagents are briefed with the worktree path"
+# B. Mechanical steps run in subagents under one hand-back contract.
+require_text '## Hand-back contract' "the skill has a Hand-back contract section"
+require_text 'returns to the delegator **at most ten lines**' "a subagent returns at most ten lines"
+require_text 'It never returns a diff, a screenshot, a browser snapshot, a test log, or a report body.' "a subagent never returns its output body"
+require_text 'The delegator never runs `git diff` itself' "the delegator never reads a diff"
+require_text 'Write to `<scratch>/<N>/implementer.md`: (a) the list of files changed' "the implementer report goes to a file"
+require_text 'its full report goes to `<scratch>/<N>/checks/<process|acceptance|whole-diff>.md`' "the three checks report to files"
+require_text '   - **Process.** The project'"'"'s `tdd-guardian` agent.' "the tdd-guardian check is unchanged"
+require_text 'dispatch one walkthrough subagent' "the walkthrough runs in a subagent"
+require_text 'The delegator never runs `agent-browser`' "the delegator never drives the browser"
+require_text 'The re-walk never runs in the main session.' "the repair-round re-walk runs in a subagent"
+require_text 'Then dispatch one ship subagent' "commit, evidence, push, PR and comment run in a ship subagent"
+require_text 'The ship subagent runs `git commit -F <commit message file>`; the delegator commits nothing.' "the delegator commits nothing"
+require_text '11. **Evidence.** The ship subagent, in the same dispatch' "evidence is pushed by the ship subagent"
+require_text 'returns at most ten lines: the PR URL, the head SHA, the evidence commit SHA or `none`' "the ship subagent returns the PR URL and evidence SHA"
+require_text 'with the proposed message shown, **before** the ship subagent is dispatched' "a hand-started Work asks for commit approval before shipping"
+require_text 'Push whatever is staged as a draft PR, through the ship subagent under the Hand-back contract' "Blocked ships through the subagent too"
+# C. Claims bookkeeping goes to one subagent, renewed less often.
+require_text '**Bookkeeping subagent.**' "claims bookkeeping has its own subagent"
+require_text 'returns only comment ids and one word per item: `won`, `lost`, `live` or `lapsed`' "the claims subagent returns ids and one word"
+require_text 'keeps the ids in `claims.json`' "claim ids live in claims.json"
+require_text 'At the start of Work steps 6, 9 and 12' "renewal happens at steps 6, 9 and 12 only"
+# D. Pick caches skips across loop passes.
+require_text 'number,title,labels,createdAt,updatedAt' "Pick lists updatedAt"
+require_text '`pick-cache.json`' "Pick keeps a skip cache"
+require_text 'is re-read (body and comments, through `gh issue view`) **only** when its `updatedAt` in the list is later than the cached value' "a cached skip is re-read only when the issue changed"
+require_text 'A cached skip is reported once per run' "a cached skip is reported once"
+# E. One issue per session.
+require_text '| `max_worktrees` | 1 |' "max_worktrees defaults to 1"
+require_text 'Parallelism comes from running several `/loop /delegate` sessions, each claiming its own issue; it does not come from one session working several issues.' "parallelism comes from more sessions"
+require_text 'One Run pass works at most one issue through to its PR before the loop reschedules' "a Run pass works one issue"
+# F. A run-level stop rule.
+require_text '## Stop rule' "the skill has a Stop rule section"
+require_text 'context use above 60 %, the run has made more than 150 tool calls in the main session, or the same isolation-guard refusal has occurred three times' "the stop rule names its three triggers"
+require_text '`run-state.json`' "the stop counters live in run-state.json"
+require_text 'A `/loop` wakeup after such a stop starts a fresh Run; it does not resume the stopped Work.' "a wakeup after a stop starts fresh"
+# G. Cloud container guidance.
+require_text '### Running in a cloud container' "the skill has cloud container guidance"
+require_text 'only the GitHub connector attached' "the guidance names the connector cost"
+require_text '`.delegator/` marker directory or `DELEGATOR_RUN=1`' "the stop hook exemption is named"
+# H. Never-rules that the rewrite must keep.
+require_text 'You do not write production code' "the delegator writes no production code"
+require_text 'A session touches only its own claim comments.' "the claims never-rule survives"
+require_text 'a command that a subagent'"'"'s own permission system refused' "no permission laundering"
+require_text 'Put a model identifier in anything pushed' "no model identifier is pushed"
+require_text '`git stash`, `git commit --amend` on a pushed branch, or `git branch -D`' "stash, amend and branch -D stay forbidden"
+require_text 'One round only.' "one repair round only"
 
 WALKTHROUGH="$REPO_ROOT/claude/.claude/skills/browser-ux-walkthrough/SKILL.md"
 if grep -Fq -- 'A caller that must not write production code' "$WALKTHROUGH"; then
