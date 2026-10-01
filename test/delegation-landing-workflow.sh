@@ -179,6 +179,21 @@ require_text 'once claimed an open PR from a `<branch_prefix>N-` branch now exis
 require_text 'A stop that posted nothing else on the item deletes the claim comment' "a waiting issue is still left without new comments"
 require_text 'Comments that carry the delegator marker do not count as a change' "one session's claims do not wake every other session's poll"
 require_text 'Edit or delete another session'"'"'s claim' "the Never list protects other sessions' claims"
+# A claim comment is only visible once the issue is opened, so the issue list
+# could not show what an agent was working on. A label shows it at a glance,
+# but a label cannot carry a session name or lapse, so it stays a signal and
+# the comment stays the lock.
+require_text '| `progress_label` | `in-progress` |' "a label marks an item an agent is working on"
+require_text 'The claim comment is the lock.' "the label never decides who holds an item"
+require_text "issues/<n>/labels -f 'labels[]=<progress_label>'" "a winning claim adds the label"
+require_text 'If it is yours, add the label' "only the winning session adds the label"
+require_text 'First remove the label (`gh api -X DELETE repos/<owner>/<repo>/issues/<n>/labels/<progress_label>`' "every release removes the label"
+require_text 'gh label create <progress_label>' "a missing label is created"
+require_text 'Never `--force`' "an existing label keeps the human's colour and description"
+require_text '**Stale label.**' "a crashed session's label is cleaned up"
+require_text 'remove the label as **Stale label** in **Claims** says, and keep it as a candidate' "Pick does not skip an issue on a stale label"
+require_text 'with no live claim is not Claimed' "Watch does not skip a PR on a stale label"
+require_text 'Put `<progress_label>` on an item without holding a live claim on it' "the Never list forbids a label without a claim"
 
 WALKTHROUGH="$REPO_ROOT/claude/.claude/skills/browser-ux-walkthrough/SKILL.md"
 if grep -Fq -- 'A caller that must not write production code' "$WALKTHROUGH"; then

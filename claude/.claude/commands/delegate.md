@@ -23,7 +23,7 @@ Otherwise the settings file's **Parameters** table sets the skill's parameters; 
 
 Parse `$ARGUMENTS`:
 
-- No arguments, or `run` → one **Run** pass: Watch, then Pick and Work. Run it as `/loop /delegate` to keep delegating until something needs the human. Several sessions can run `/loop /delegate` at once: each claims an issue or PR before touching it, and the others skip it.
+- No arguments, or `run` → one **Run** pass: Watch, then Pick and Work. Run it as `/loop /delegate` to keep delegating until something needs the human. Several sessions can run `/loop /delegate` at once: each claims an issue or PR before touching it and labels it with the skill's `progress_label` while it holds the claim, and the others skip it.
 - `#<n>` or a bare number → **Work** issue `n`.
 - `next` → **Pick**, then **Work** the result.
 - `review #<n>` or `review <n>` → **Review** PR `n`.
