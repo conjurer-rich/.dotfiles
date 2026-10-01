@@ -39,7 +39,9 @@ jobs:
         id: changesets
         uses: changesets/action@v1
         with:
-          version: pnpm changeset version
+          # Sync the plugin manifest in the same commit: Claude Code detects a
+          # marketplace update from plugin.json's version, not from git.
+          version: pnpm changeset version && node fork/sync-plugin-version.mjs
           commit: 'chore: version packages'
           title: 'chore: version packages'
         env:
