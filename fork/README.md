@@ -8,6 +8,7 @@ pulling from upstream never conflicts over release history.
 | --- | --- |
 | `/CHANGELOG.md`, `/package.json` | upstream — never edit in the fork |
 | `fork/CHANGELOG.md`, `fork/package.json` | this fork |
+| `claude/.claude/.claude-plugin/plugin.json` `version` | this fork — written by `fork/sync-plugin-version.mjs`, never by hand |
 
 ## Adding a changeset
 
@@ -22,7 +23,11 @@ What changed, for someone installing the fork.
 ```
 
 `release.yml` tags `v<fork/package.json version>`, which `install-rich.sh`
-resolves as the latest release.
+resolves as the latest release. The same run copies that version into the
+craft plugin manifest (`claude/.claude/.claude-plugin/plugin.json`): Claude
+Code offers a marketplace plugin update when the manifest version changes,
+not when commits land, so a manifest left behind pins installed copies to an
+old release. `test/plugin-version-sync.sh` fails when the two drift.
 
 ## Pulling from upstream
 
