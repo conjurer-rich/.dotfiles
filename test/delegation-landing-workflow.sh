@@ -316,12 +316,44 @@ require_text 'Apply only changes that preserve behaviour; do not change any test
 require_text 'Do not fix anything that needs a behaviour change: return it instead.' "Land still returns behaviour-changing findings"
 require_text 'If test files changed, run the project'"'"'s `tdd-guardian` agent on the staged diff' "Land runs tdd-guardian only when tests changed"
 
+# The walkthrough booted Docker, auth and the dev servers for test-only and
+# data-layer diffs under the UI root, graded every item in both themes, and
+# booted the stack a second time for the repair round's after-screenshots.
+require_text '| `walkthrough_paths` | the UI root, minus `**/*.test.*`, `**/*.spec.*` and `**/__tests__/**` |' "walkthrough_paths defaults to the UI root without tests"
+require_text 'a changed file matches `walkthrough_paths`' "the walkthrough triggers on walkthrough_paths"
+require_text 'A test-only diff matches none of the defaults' "a test-only diff never boots the stack"
+reject_regex 'contains a path under the project'"'"'s UI root' "the walkthrough no longer triggers on any UI-root path"
+require_text 'the Checklist sections and themes its **Scope** step selects' "the walkthrough grades only the relevant sections"
+require_text 'leave it running for step 9'"'"'s re-walk' "the stack stays up for the repair round"
+require_text 're-walks them on the stack it left running' "the re-walk does not boot the stack again"
+reject_regex 'it boots and signs in per the Recipe, re-walks' "the repair round no longer reboots the stack"
+require_text 'send the walkthrough subagent one message to stop the stack' "a run never leaves the stack running"
+
 WALKTHROUGH="$REPO_ROOT/claude/.claude/skills/browser-ux-walkthrough/SKILL.md"
 if grep -Fq -- 'A caller that must not write production code' "$WALKTHROUGH"; then
   pass "the walkthrough lets a no-code caller skip its Fix step"
 else
   fail "the walkthrough lets a no-code caller skip its Fix step"
 fi
+
+require_walkthrough() {
+  local pattern="$1" label="$2"
+
+  if grep -Fq -- "$pattern" "$WALKTHROUGH"; then
+    pass "$label"
+  else
+    fail "$label"
+  fi
+}
+
+require_walkthrough '3. **Scope.**' "the walkthrough scopes the checklist to the change"
+require_walkthrough '| Copy only (' "copy-only changes have a scope row"
+require_walkthrough '| Style or token (' "style or token changes have a scope row"
+require_walkthrough 'Both themes only when the scope is **Style or token**' "both themes only for style or token changes"
+require_walkthrough 'Sections skipped:' "the output names the skipped sections"
+require_walkthrough 'test files (`*.test.*`, `*.spec.*`, `__tests__/**`) are not UI files' "test files never trigger a walkthrough"
+require_walkthrough 'Stop the stack once' "the stack is stopped once"
+require_walkthrough 're-walks the affected surfaces on the running stack' "a no-code caller re-walks without a second boot"
 
 echo ""
 
