@@ -1,0 +1,26 @@
+{
+  "data": {
+    "repository": {
+      "pullRequest": {
+        "isDraft": true,
+        "headRefOid": "h24",
+        "reviewThreads": {
+          "nodes": []
+        },
+        "reviews": {
+          "nodes": []
+        },
+        "ready": {
+          "filteredCount": 0
+        },
+        "latest": {
+          "nodes": [
+            {
+              "__typename": "PullRequestCommit"
+            }
+          ]
+        }
+      }
+    }
+  }
+}

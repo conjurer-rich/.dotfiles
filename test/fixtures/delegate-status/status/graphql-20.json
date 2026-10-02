@@ -1,0 +1,150 @@
+{
+  "data": {
+    "repository": {
+      "pullRequest": {
+        "isDraft": true,
+        "headRefOid": "h20",
+        "reviewThreads": {
+          "nodes": [
+            {
+              "id": "T1",
+              "isResolved": false,
+              "comments": {
+                "nodes": [
+                  {
+                    "databaseId": 601,
+                    "body": "Rename this please",
+                    "author": {
+                      "login": "rich",
+                      "__typename": "User"
+                    }
+                  }
+                ]
+              },
+              "path": "src/import.ts",
+              "line": 42
+            },
+            {
+              "id": "T2",
+              "isResolved": false,
+              "comments": {
+                "nodes": [
+                  {
+                    "databaseId": 603,
+                    "body": "Renamed in abc123.\n<!-- delegator -->",
+                    "author": {
+                      "login": "rich",
+                      "__typename": "User"
+                    }
+                  }
+                ]
+              },
+              "path": "src/import.ts",
+              "line": 42
+            },
+            {
+              "id": "T3",
+              "isResolved": false,
+              "comments": {
+                "nodes": [
+                  {
+                    "databaseId": 604,
+                    "body": "Unused import",
+                    "author": {
+                      "login": "github-advanced-security",
+                      "__typename": "Bot"
+                    }
+                  }
+                ]
+              },
+              "path": "src/import.ts",
+              "line": 42
+            },
+            {
+              "id": "T4",
+              "isResolved": true,
+              "comments": {
+                "nodes": [
+                  {
+                    "databaseId": 605,
+                    "body": "Old request",
+                    "author": {
+                      "login": "rich",
+                      "__typename": "User"
+                    }
+                  }
+                ]
+              },
+              "path": "src/import.ts",
+              "line": 42
+            },
+            {
+              "id": "T5",
+              "isResolved": false,
+              "comments": {
+                "nodes": [
+                  {
+                    "databaseId": 606,
+                    "body": "Fixed it.\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)",
+                    "author": {
+                      "login": "rich",
+                      "__typename": "User"
+                    }
+                  }
+                ]
+              },
+              "path": "src/import.ts",
+              "line": 42
+            }
+          ]
+        },
+        "reviews": {
+          "nodes": [
+            {
+              "databaseId": 701,
+              "body": "Overall: split the helper",
+              "author": {
+                "login": "rich",
+                "__typename": "User"
+              }
+            },
+            {
+              "databaseId": 702,
+              "body": "",
+              "author": {
+                "login": "rich",
+                "__typename": "User"
+              }
+            },
+            {
+              "databaseId": 703,
+              "body": "Please add a changelog line",
+              "author": {
+                "login": "rich",
+                "__typename": "User"
+              }
+            },
+            {
+              "databaseId": 704,
+              "body": "LGTM",
+              "author": {
+                "login": "copilot-pull-request-reviewer",
+                "__typename": "Bot"
+              }
+            }
+          ]
+        },
+        "ready": {
+          "filteredCount": 0
+        },
+        "latest": {
+          "nodes": [
+            {
+              "__typename": "PullRequestCommit"
+            }
+          ]
+        }
+      }
+    }
+  }
+}

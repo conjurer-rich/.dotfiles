@@ -5,9 +5,9 @@ description: Take a triaged GitHub issue end-to-end to a reviewable pull request
 
 # Delegating GitHub issues
 
-You are the delegator. You do not write production code, and you do no mechanical work in your own context: it runs in subagents under the **Hand-back contract**, and you read their verdicts, not their output. Your job is eligibility, budget, claims (through the claims subagent in **Claims**), reading and deriving acceptance criteria, the size check, creating the worktree, dispatching subagents, reading verdict tables, deciding deferrals, writing the PR body and commit message files, and reporting. Bootstrap, implementation, the independent checks, the walkthrough, commit, evidence push, PR creation and issue comments are each a subagent's job. You never enter a worktree. A human reviews. With `land` on, the delegator also merges, but only a PR the human marked Ready for review, only through **Land**.
+You are the delegator. You do not write production code, and you do no mechanical work in your own context: subagents do it under the **Hand-back contract**, and you read their verdicts, not their output. You decide eligibility, budget, claims, acceptance criteria, the size check and tier, and deferrals, and you write the PR body and commit message files. Bootstrap, implementation, the independent checks, the walkthrough, commit, evidence push, PR creation and issue comments are each a subagent's job. You never enter a worktree. A human reviews. With `land` on, the delegator also merges, but only a PR the human marked Ready for review, only through **Land**.
 
-A run that follows the skill literally in one context fills that context: the aborted run that shaped this version worked three issues at once, re-phrased worktree-guarded git commands dozens of times, ran browser walkthroughs inline, and read every subagent report in full. The **Stop rule** ends a run before that happens.
+The **Stop rule** ends a run before it fills its context, as the aborted run that shaped this skill did: it worked three issues at once, ran browser walkthroughs inline and read every subagent report in full.
 
 ## Parameters
 
@@ -15,87 +15,45 @@ The calling command supplies these; defaults apply when it does not.
 
 | Parameter | Default | Meaning |
 |---|---|---|
-| `label` | `agent-ready` | Only issues carrying this label are eligible |
+| `label` | `agent-ready` | Only issues with this label are eligible |
 | `rank_labels` | `p1`, `p2` | Higher rank first; unranked last |
-| `max_worktrees` | 1 | Active worktrees whose branch starts with `delegated/`. Parallelism comes from running several `/loop /delegate` sessions, each claiming its own issue; it does not come from one session working several issues. A project may raise this, at the cost of that session's context |
+| `max_worktrees` | 1 | Active `<branch_prefix>` worktrees. Parallelism comes from running several `/loop /delegate` sessions, each claiming its own issue; it does not come from one session working several issues. |
 | `max_open_prs` | 6 | Open PRs in the repository, all authors |
-| `branch_prefix` | `delegated/` | Branch name prefix for every delegated worktree |
-| `pre_pr_gate` | the project's `/pr` command | The gate the implementer must pass before the PR opens |
-| `tier_small_max_lines` | 150 | A staged diff of at most this many changed lines (insertions plus deletions) can be tier S. `0` turns tier S off |
-| `tier_small_max_packages` | 1 | A staged diff touching at most this many packages can be tier S |
-| `local_full_suite` | off | When on, the implementer also runs the complete test suite locally before the PR opens. Off, CI runs it on the PR and Land waits for CI |
-| `risk_paths` | none | Globs. A diff touching any of them is never tier S. A project lists its migrations and its riskiest packages |
-| `walkthrough` | off | When on, run the `browser-ux-walkthrough` skill for diffs with a file that matches `walkthrough_paths` |
-| `walkthrough_paths` | the UI root, minus `**/*.test.*`, `**/*.spec.*` and `**/__tests__/**` | Globs of user-visible UI files that trigger a walkthrough. A glob starting with `!` excludes. A project narrows it to leave out data-layer and other non-visible code under its UI root |
-| `oracle` | off | When on, apply the Preview oracle rule below |
-| `land` | off | When on, Work opens PRs as drafts, and **Land** may merge a PR the human marked Ready for review |
-| `claim_ttl` | 4 hours | A claim not renewed for this long lapses, and another session may take the issue or PR |
-| `progress_label` | `in-progress` | Carried by an issue or PR while a delegator session holds a live claim on it, so a human sees at a glance that an agent is working on it |
+| `branch_prefix` | `delegated/` | Prefix of every delegated branch |
+| `pre_pr_gate` | the project's `/pr` command | The gate the implementer passes before the PR opens |
+| `tier_small_max_lines` | 150 | Most changed lines (insertions plus deletions) a tier S diff may have; `0` turns tier S off |
+| `tier_small_max_packages` | 1 | Most packages a tier S diff may touch |
+| `risk_paths` | none | Globs a tier S diff may not touch: migrations, the riskiest packages |
+| `local_full_suite` | off | When on, the implementer also runs the complete test suite locally; off, CI runs it on the PR |
+| `walkthrough` | off | When on, run `browser-ux-walkthrough` when a changed file matches `walkthrough_paths` |
+| `walkthrough_paths` | the UI root, minus `**/*.test.*`, `**/*.spec.*` and `**/__tests__/**` | Globs of user-visible UI files; a glob starting with `!` excludes |
+| `oracle` | off | When on, apply the Preview oracle rule |
+| `land` | off | When on, Work opens drafts, and **Land** may merge a PR the human marked Ready for review |
+| `claim_ttl` | 4 hours | A claim not renewed for this long lapses, and another session may take the item |
+| `progress_label` | `in-progress` | Carried by an item while a session holds a live claim on it, so a human sees an agent is on it |
 
 ## Delegator marker
 
-The delegator posts through the human's `gh` auth, so a comment's author cannot tell the two apart. Every comment and thread reply the delegator posts therefore ends with this line:
+The delegator posts through the human's `gh` auth, so a comment's author cannot tell the two apart. Every comment and thread reply the delegator posts therefore ends with `<!-- delegator -->`. Other agent sessions post through the same auth with the Claude Code footer (`[Claude Code](https://claude.`) instead.
 
-    <!-- delegator -->
-
-Other agent sessions post through the same auth without the marker. The footer Claude Code adds (`[Claude Code](https://claude.`) identifies their posts.
-
-A comment **needs an answer** when all five hold:
-
-- it does not contain `<!-- delegator`;
-- it does not contain the Claude Code footer: another agent posted it, not the human;
-- its author login does not end in `[bot]`;
-- it does not contain `<!-- preview-`;
-- it has not been answered. An inline comment is answered when a comment containing `<!-- delegator` or the Claude Code footer follows it in the same review thread. A top-level comment or review body is answered when a PR comment contains `<!-- delegator reply-to: <comment id> -->` with its id; Land's own status comments answer nothing.
+A comment **needs an answer** when it does not contain `<!-- delegator`, it does not contain the Claude Code footer (another agent posted it, not the human), its author login does not end in `[bot]` (nor is a GitHub App), it does not contain `<!-- preview-`, and nothing answers it. A later comment with either marker in the same review thread answers an inline comment. A PR comment containing `<!-- delegator reply-to: <comment id> -->` answers a top-level comment or review body; Land's own status comments answer nothing. `delegate-status` computes this.
 
 ## Claims
 
-Several delegator sessions can run at once, and all post through the same `gh` login, so a session claims an issue (Work) or PR (Review, Land) with a comment before it changes anything, and the others leave a claimed item alone.
+Several delegator sessions can run at once through one `gh` login, so a session claims an issue (Work) or PR (Review, Land) with a comment before it changes anything. The claim comment is the lock: it ends `<!-- delegator claim: <session> -->`, it is live while updated within `claim_ttl`, and the live claim with the lowest comment id wins, so two sessions that claim at once agree on one winner. `<progress_label>` only tells humans: the winner adds it and every release removes it, and it never decides who holds an item.
 
-The claim comment is the lock. The `<progress_label>` label is the signal for humans: a session adds it when its claim wins and removes it when it releases, so the issue list shows what an agent is working on without anyone opening the comments. The label never decides anything: a crashed session leaves its label behind, and only the live-claims query below says whether a claim is live.
+**Session name.** Before its first claim, a session names itself with 8 random hex characters. It is not the **Session title**; the two never mix.
 
-**Session name.** Before its first claim, a session names itself with 8 random hex characters and uses that name for every claim it makes. The name is for claims; the chat name the human sees is the **Session title** below, and the two never mix.
+**`delegate-status`.** `scripts/delegate-status`, in this skill's directory, runs the claims and every fixed query and prints one JSON line. Run it from the main checkout with `--repo <owner>/<repo> --session <session>` and each parameter the project changed (`--label`, `--rank-labels`, `--prefix`, `--progress-label`, `--claim-ttl <seconds>`, `--max-worktrees`, `--max-open-prs`, `--land on`). Keep claim ids in `claims.json` in the run's scratch directory. On a non-zero exit, report its last line and stop.
 
-**Bookkeeping subagent.** The delegator runs none of the `gh api` calls below itself: in the aborted run they were thirty-plus calls in the main context. One lightweight `general-purpose` subagent per run (model `haiku` is fine) does claim, confirm, renew and release. Its first brief carries the session name, owner/repo, `claim_ttl` in seconds, the commands in this section and the **Hand-back contract**; each later request (`SendMessage` to the same subagent, never a fresh one) carries the item number, the action and the comment id. It returns only comment ids and one word per item: `won`, `lost`, `live` or `lapsed`. The delegator keeps the ids in `claims.json` in the run's scratch directory, keyed by item number, and reads nothing else about a claim.
+- **Claim.** `claim <n>` prints `won` with the `id` (and `open_pr` when a delegated PR is open for the issue), or `lost` with the `holder`. It reuses this session's live claim, so a session never claims an item twice. The loser deletes its own claim comment; a human-started entry point says `#<n> is claimed by delegator session <holder>` and stops. The winner adds the label, creating it if missing; Never `--force`.
+- **Confirm.** `confirm <n> <id>` prints `live` or `lost`. Confirm before any push, PR creation or merge. On `lost`, write nothing more to the item, report it lost to the holder, and leave staged work in the worktree.
+- **Renew.** `renew <n> <id>` confirms, then rewrites the claim's first line to end `renewed <UTC time>`. A lapsed claim keeps its low id, so renewing it blindly would take the item back from the session that claimed it since: a lapsed claim prints `lost` and nothing is written. Renew only right before a long step, Work steps 6, 8 and 9, Review step 5, Land steps 5 and 7, so each starts with a whole `claim_ttl`. The implementer handoff is the longest; a project whose handoffs can outlast `claim_ttl` raises it. A lapse is still caught by the next Confirm.
+- **Release.** Every stop releases the claim with `release <n> <id>`, which removes the label first. A stop that posted nothing else on the item deletes the claim comment (`--delete`); any other stop rewrites it (`--reason "<one-line reason>"`) as ``Released by delegator session `<session>`: <reason>.`` and `<!-- delegator claim-released: <session> -->`. It refuses a comment that is not this session's.
 
-**Label.** Before its first claim, a session makes sure the repository has the label. `gh label list --search <progress_label> --json name --jq '.[] | select(.name == "<progress_label>") | .name'` prints nothing when it is missing; then `gh label create <progress_label> --color FBCA04 --description 'A delegator session is working on this'`. Never `--force`: an existing label keeps the colour and description the human gave it.
+A Land waiting on a background task has not stopped: its claim and label hold. Review steps inside Land use Land's claim. A crashed session's claims lapse after `claim_ttl`; the human frees one sooner by deleting it.
 
-**Claim.** If you already hold a live claim on the item, use it. Otherwise post one and keep its id:
-
-```bash
-gh api repos/<owner>/<repo>/issues/<n>/comments -f body='Claimed by delegator session `<session>` until released, or <claim_ttl> without renewal.
-<!-- delegator claim: <session> -->' --jq .id
-```
-
-Then list the live claims, the ones updated within `claim_ttl`:
-
-```bash
-gh api repos/<owner>/<repo>/issues/<n>/comments --paginate \
-  --jq '.[] | select((.body | contains("<!-- delegator claim: ")) and (now - (.updated_at | fromdateiso8601) < <claim_ttl in seconds>)) | {id, updated_at, body}'
-```
-
-The live claim with the lowest comment id wins, so two sessions that claim at the same moment agree on one winner. If it is not yours, delete your own claim comment (`gh api -X DELETE repos/<owner>/<repo>/issues/comments/<id>`): another session holds the item, and a human-started entry point says `#<n> is claimed by delegator session <session>` and stops. If it is yours, add the label:
-
-```bash
-gh api -X POST repos/<owner>/<repo>/issues/<n>/labels -f 'labels[]=<progress_label>'
-```
-
-This endpoint takes issues and PRs alike, and adding a label the item already carries is a no-op.
-
-**Confirm.** Re-run the live-claims query and check that your claim is live and still wins. If not, the item is lost: stop without writing anything more to it, and report it as lost to the named session. Staged work stays in the worktree for the human. Confirm before any push, PR creation or merge.
-
-**Renew.** At the start of Work steps 6, 9 and 12 (before the long dispatches and before the push), Review step 6 and Land steps 4, 6 and 8, not at every numbered step, confirm the claim, then rewrite its first line to end `renewed <UTC time>` (`gh api -X PATCH repos/<owner>/<repo>/issues/comments/<id> -f body='…'`). Confirming first matters: a lapsed claim keeps its low id, and renewing it blindly would take the item back from the session that claimed it since.
-
-**Release.** Every stop releases the claim. First remove the label (`gh api -X DELETE repos/<owner>/<repo>/issues/<n>/labels/<progress_label>`; a 404 means it was already gone). A stop that posted nothing else on the item deletes the claim comment; any other stop rewrites it as:
-
-```text
-Released by delegator session `<session>`: <the one-line reason the run stopped>.
-<!-- delegator claim-released: <session> -->
-```
-
-A Land waiting on a background task has not stopped, so its claim and its label hold. A crashed or restarted session's claims lapse after `claim_ttl`; the human frees one sooner by deleting its comment. Its label does not lapse: **Stale label** below removes it. Review steps run inside Land use Land's claim.
-
-**Stale label.** An item that carries `<progress_label>` with no live claim was left by a session that crashed or was restarted. Any session that finds one while classifying (Pick step 3, Watch step 3) removes the label, with the same command Release uses, and then treats the item as free. The label is not a claim, so this does not touch another session's claim comment.
+**Stale label.** `stale_label` marks an item that carries `<progress_label>` with no live claim, left by a crashed session. Pick and Watch remove it with `clear-label <n>`, which refuses while a claim is live, then treat the item as free.
 
 ## Stop rule
 

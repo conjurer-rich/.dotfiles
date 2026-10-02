@@ -2,7 +2,7 @@
 
 Every subagent writes its full report to a file under the scratchpad directory (or `<worktree>/.delegator/` when no scratchpad is available) and returns to the delegator **at most ten lines**: the file path, a one-word verdict (`pass` / `findings` / `blocked`), and a count or one-line summary. It never returns a diff, a screenshot, a browser snapshot, a test log, or a report body. The delegator reads the file only when it has to decide something and then reads only the verdict table or findings list, never the diff. The delegator never runs `git diff` itself; when it needs to know which files changed it asks the subagent for `git diff --cached --name-only` and nothing more.
 
-The contract applies to every subagent this skill dispatches: bootstrap, implementer, the three independent checks, walkthrough, ship, claims, and the Blocked comment. Unless a step says otherwise, a dispatch is `subagent_type: general-purpose` at its default model with `run_in_background: false`.
+The contract applies to every subagent this skill dispatches: bootstrap, implementer, the independent checks, walkthrough, ship, and the Blocked comment. Unless a step says otherwise, a dispatch is `subagent_type: general-purpose` at its default model with `run_in_background: false`.
 
 **Scratch layout.** One directory per run, `<scratchpad>/delegator/<session name>/`: `run-state.json` (the **Stop rule** counters and the **Session title** state), `claims.json` (**Claims**), `pick-cache.json` (**Pick**), and per issue `<N>/implementer.md`, `<N>/checks/<check>.md`, `<N>/walkthrough.md`, `<N>/commit-message.md`, `<N>/pr-body.md`, `<N>/ship.md`, and screenshots at `<N>/<surface>-<theme>-<before|after>.png`. Every brief names the files it must write.
 

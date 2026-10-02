@@ -1,0 +1,125 @@
+#!/usr/bin/env bash
+#
+# Fake gh for test/delegate-status.sh. Serves recorded API responses from
+# $FAKE_STATE (a per-test copy of a fixture scenario), applies writes to the
+# recorded comments so a later read sees them, and logs every call to
+# $FAKE_STATE/calls.log.
+#
+
+set -euo pipefail
+
+state="${FAKE_STATE:?FAKE_STATE is not set}"
+printf '%s\n' "$*" >> "$state/calls.log"
+
+method=GET
+paginate=0
+args=()
+fields=()
+while [ $# -gt 0 ]; do
+  case "$1" in
+    -X|--method) method="$2"; shift 2 ;;
+    --paginate) paginate=1; shift ;;
+    -f|-F|--raw-field|--field) fields+=("$2"); shift 2 ;;
+    *) args+=("$1"); shift ;;
+  esac
+done
+
+field() {
+  local name="$1" f
+  for f in "${fields[@]}"; do
+    case "$f" in "$name="*) printf '%s' "${f#"$name="}"; return ;; esac
+  done
+}
+
+serve() {
+  if [ -f "$state/$1" ]; then cat "$state/$1"; else printf '%s\n' "${2:-[]}"; fi
+}
+
+now_iso() {
+  date -u -d "@${DELEGATE_STATUS_NOW:?}" +%Y-%m-%dT%H:%M:%SZ
+}
+
+comments_file_holding() {
+  local id="$1" f
+  for f in "$state"/comments-*.json; do
+    [ -f "$f" ] || continue
+    if jq -e --argjson id "$id" 'any(.[]; .id == $id)' "$f" > /dev/null; then
+      printf '%s' "$f"
+      return
+    fi
+  done
+}
+
+case "${args[0]:-}" in
+  issue)
+    [ "${args[1]}" = list ] && serve issues.json && exit 0
+    [ "${args[1]}" = view ] && serve "issue-view-${args[2]}.json" '{}' && exit 0 ;;
+  label)
+    case "${args[1]}" in
+      list) serve labels.json; exit 0 ;;
+      create) exit 0 ;;
+    esac ;;
+  pr)
+    if [ "${args[1]}" = view ]; then
+      serve "pr-view-${args[2]}.json" '{}'
+      exit 0
+    fi
+    if [ "${args[1]}" = list ]; then
+      for ((i = 2; i < ${#args[@]}; i++)); do
+        if [ "${args[$i]}" = --head ]; then
+          serve "pr-head-$(printf '%s' "${args[$((i + 1))]}" | tr '/' '_').json"
+          exit 0
+        fi
+      done
+      serve prs.json
+      exit 0
+    fi ;;
+  api)
+    path="${args[1]}"
+    case "$method $path" in
+      "GET user") serve user.json '{}'; exit 0 ;;
+      "POST graphql"|"GET graphql")
+        serve "graphql-$(field pr).json" '{}'; exit 0 ;;
+      GET\ repos/*/issues/comments/*/reactions)
+        id="${path%/reactions}"; id="${id##*/}"
+        serve "reactions-$id.json"; exit 0 ;;
+      GET\ repos/*/issues/comments/*)
+        id="${path##*/}"
+        f="$(comments_file_holding "$id")"
+        if [ -z "$f" ]; then echo "gh: Not Found (HTTP 404)" >&2; exit 1; fi
+        jq --argjson id "$id" '.[] | select(.id == $id)' "$f"; exit 0 ;;
+      GET\ repos/*/issues/*/comments)
+        n="${path%/comments}"; n="${n##*/}"
+        serve "comments-$n.json"; exit 0 ;;
+      POST\ repos/*/issues/*/comments)
+        n="${path%/comments}"; n="${n##*/}"
+        f="$state/comments-$n.json"
+        [ -f "$f" ] || echo '[]' > "$f"
+        id="$(cat "$state/next-id" 2>/dev/null || echo 900)"
+        echo $((id + 1)) > "$state/next-id"
+        jq --argjson id "$id" --arg body "$(field body)" --arg at "$(now_iso)" --arg login "$(jq -r .login "$state/user.json")" \
+          '. + [{id: $id, body: $body, created_at: $at, updated_at: $at, user: {login: $login}}]' "$f" > "$f.tmp"
+        mv "$f.tmp" "$f"
+        jq -n --argjson id "$id" '{id: $id}'; exit 0 ;;
+      PATCH\ repos/*/issues/comments/*)
+        id="${path##*/}"
+        f="$(comments_file_holding "$id")"
+        jq --argjson id "$id" --arg body "$(field body)" --arg at "$(now_iso)" \
+          'map(if .id == $id then .body = $body | .updated_at = $at else . end)' "$f" > "$f.tmp"
+        mv "$f.tmp" "$f"
+        jq -n --argjson id "$id" '{id: $id}'; exit 0 ;;
+      DELETE\ repos/*/issues/comments/*)
+        id="${path##*/}"
+        f="$(comments_file_holding "$id")"
+        jq --argjson id "$id" 'map(select(.id != $id))' "$f" > "$f.tmp"
+        mv "$f.tmp" "$f"
+        exit 0 ;;
+      POST\ repos/*/issues/*/labels) echo '[]'; exit 0 ;;
+      DELETE\ repos/*/issues/*/labels/*)
+        if [ -f "$state/labels-404" ]; then echo "gh: Label does not exist (HTTP 404)" >&2; exit 1; fi
+        exit 0 ;;
+    esac ;;
+esac
+
+echo "fake gh: no fixture for: $method ${args[*]}" >&2
+exit 1

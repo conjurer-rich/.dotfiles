@@ -1,0 +1,11 @@
+[
+  {
+    "number": 40,
+    "title": "fix(web): thing (#12)",
+    "isDraft": true,
+    "headRefName": "delegated/12-fix-thing",
+    "headRefOid": "h40",
+    "createdAt": "2026-10-02T11:59:00Z",
+    "labels": []
+  }
+]

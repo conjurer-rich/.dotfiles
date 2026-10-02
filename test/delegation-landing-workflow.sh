@@ -43,6 +43,20 @@ require_text() {
   fi
 }
 
+# Computation moved out of the prose into scripts/delegate-status; its
+# behaviour is tested in test/delegate-status.sh, and these pins check the
+# script still carries the protocol's fixed strings.
+DELEGATE_STATUS="$SKILL_DIR/scripts/delegate-status"
+require_script() {
+  local pattern="$1" label="$2"
+
+  if grep -Fq -- "$pattern" "$DELEGATE_STATUS"; then
+    pass "$label"
+  else
+    fail "$label"
+  fi
+}
+
 reject_regex() {
   local pattern="$1" label="$2"
 
@@ -60,7 +74,7 @@ require_text '<!-- delegator -->' "delegator comments carry the marker"
 require_text 'Every comment and thread reply the delegator posts therefore ends with' "every delegator post is marked"
 require_text 'does not end in `[bot]`' "bot comments never need an answer"
 require_text 'does not contain `<!-- preview-`' "preview stickies never need an answer"
-require_text 'issues/<PR>/comments --paginate' "Review reads top-level PR comments"
+require_script 'gh_json api --paginate "repos/$REPO/issues/$1/comments"' "Review reads top-level PR comments"
 require_text 'Merge a PR, except through **Land** with `land` on.' "merging is confined to Land"
 require_text '`gh pr ready` runs only with `--undo`' "only the human marks a PR ready"
 reject_regex 'merge a PR, resolve a review thread' "the unconditional never-merge line is gone"
@@ -70,9 +84,10 @@ require_text '# Watch' "Watch entry point exists"
 require_text 'READY_FOR_REVIEW_EVENT' "Ready is read from the PR timeline"
 # timelineItems' totalCount ignores itemTypes and counts every timeline item,
 # so a gate on it calls every PR ready. filteredCount is the filtered count.
-require_text 'ready: timelineItems(itemTypes:[READY_FOR_REVIEW_EVENT]){ filteredCount }' "Ready counts only ready events"
+require_script 'ready: timelineItems(itemTypes:[READY_FOR_REVIEW_EVENT]){ filteredCount }' "Ready counts only ready events"
 require_text '`ready.filteredCount` is above 0' "Ready gates on the filtered count"
 reject_regex 'totalCount' "no gate reads the unfiltered timeline count"
+if grep -q totalCount "$DELEGATE_STATUS"; then fail "the script never reads the unfiltered timeline count"; else pass "the script never reads the unfiltered timeline count"; fi
 require_text 'never Ready' "a PR opened as non-draft is never landed"
 # The watcher may run on a machine that did not open the PR, so Review, not
 # just Land, must be able to create the worktree it needs.
@@ -102,7 +117,8 @@ require_text 'continue only when every changed path is one the project'"'"'s CI 
 require_text 'Steps 1–3 always run, including on resume.' "resuming Land still checks eligibility"
 require_text 'Bail-out** with the reason `commits after Ready`' "a commit pushed after Ready is not landed"
 require_text '<!-- delegator reply-to: <comment id> -->' "a top-level answer names the comment it answers"
-require_text 'pulls/<PR>/reviews --paginate' "a review summary body is read as a comment"
+require_script 'reviews(first:100){ nodes{ databaseId body author{ login __typename } } }' "a review summary body is read as a comment"
+require_text 'review body (`review`)' "Review answers review bodies too"
 require_text 'Never go to **Blocked** from **Watch** or **Land**.' "an unattended run never waits on approval"
 require_text 'gh pr checks <PR> --watch --fail-fast` as a background task' "the CI wait runs in the background"
 reject_regex 'timeout 540' "no foreground CI wait sized to one tool call"
@@ -135,7 +151,7 @@ require_text 'The implementer'"'"'s returns are claims, not evidence.' "the impl
 require_text 'loads `acceptance-review`' "acceptance criteria are checked independently"
 require_text 'The project'"'"'s whole-PR review agent' "the whole diff is reviewed before the PR opens"
 require_text 'do **not** run its Fix step' "the delegator never applies walkthrough fixes itself"
-require_text 'Then re-run the checks for the tier: at tier M or L, `tdd-guardian` and every check that reported a blocking finding, as step 7 dispatches them; at tier S, the one reviewer.' "the repair round is re-checked"
+require_text 'Then re-run the checks for the tier, measured again from the fresh (g): at tier M or L, `tdd-guardian` and every check that reported a blocking finding, as step 7 dispatches them; at tier S, the one reviewer.' "the repair round is re-checked"
 require_text 'edit this comment to change them, then react' "derived acceptance criteria wait for the human"
 require_text 'including any glossary or vocabulary check' "the gate's glossary step is not dropped"
 reject_regex 'gate'"'"'s steps 1–5' "the pre-PR gate is not truncated"
@@ -145,10 +161,12 @@ reject_regex 'gate'"'"'s steps 1–5' "the pre-PR gate is not truncated"
 # round refreshes the gate evidence, and the verdict words match the checkers.
 require_text 'post nothing, and stop' "a waiting issue is never re-posted"
 require_text 'Take the first issue that is not waiting on the human' "Pick skips issues waiting on the human"
-require_text '`gh api user -q .login`' "only the authenticated login's reaction confirms"
+require_script 'gh_json api user' "only the authenticated login's reaction confirms"
+require_script '.content == "+1" and .user.login == $l' "only a thumbs-up from that login confirms"
+require_text 'Only that login'"'"'s reaction counts' "the skill says why only that login counts"
 require_text 'does not rate `Covered`' "acceptance verdicts use acceptance-review's statuses"
 require_text 'rated Critical or High Priority' "whole-diff severity uses pr-reviewer's scale"
-require_text 'returns (a)–(f) afresh' "the repair round refreshes the gate evidence"
+require_text 'returns (a)–(g) afresh' "the repair round refreshes the gate evidence and the tier measurement"
 require_text 'wait for it to exit' "the implementer waits for the background suite"
 require_text 'On every path out of this step except **Blocked**' "the UX walkthrough section is written with or without a repair"
 require_text 'the PR already exists, so **Blocked** does not apply' "a human-started Review never opens a second PR"
@@ -166,7 +184,7 @@ require_text 'a Run pass never waits on the human' "Run never blocks on a human 
 require_text '| `claim_ttl` | 4 hours |' "claims lapse after a default lease"
 require_text '<!-- delegator claim: <session> -->' "a claim names the session holding it"
 require_text 'live claim with the lowest comment id wins' "a race between two sessions has one winner"
-require_text 'delete your own claim comment' "the losing session withdraws its claim"
+require_text 'The loser deletes its own claim comment' "the losing session withdraws its claim"
 require_text 'Every stop releases the claim' "a session releases its claim on every exit"
 require_text '<!-- delegator claim-released: <session> -->' "a released claim stays readable on the issue"
 require_text 'Skip an issue that has an open PR from a `<branch_prefix><n>-` branch' "Pick never re-picks an issue that already has a PR"
@@ -174,7 +192,7 @@ require_text 'skip an issue another session holds a live claim on' "Pick skips i
 require_text 'otherwise say this PR was not opened by a delegated run and stop. Then claim the PR (**Claims**)' "Review claims the PR before touching it"
 require_text 'say so and stop. Then claim the PR (**Claims**); if another session holds it, stop. The PR must be **Ready**' "Land claims the PR before it can bail out"
 require_text 'Confirm before any push, PR creation or merge.' "a session that lost its claim writes nothing more"
-require_text 'Confirm the claim is still yours (**Claims**) before dispatching, and renew it. The ship subagent then runs `git push -u origin <branch>`' "Work confirms its claim before the ship subagent pushes"
+require_text 'Confirm the claim is still yours (**Claims**) before dispatching. The ship subagent then runs `git push -u origin <branch>`' "Work confirms its claim before the ship subagent pushes"
 require_text 'Confirm the claim is still yours, then dispatch the ship subagent (**Work** step 10'"'"'s brief without PR creation: it commits from the message file and pushes with no force flag' "Review confirms its claim before the ship subagent pushes"
 require_text 'then `git push`, with no force flag; it returns the new head SHA' "Land's ship subagent pushes with no force flag"
 require_text 'Confirm the claim is still yours, then dispatch the ship subagent (**Work** step 10'"'"'s brief without PR creation): step 4'"'"'s merge' "Land confirms its claim before the ship subagent pushes"
@@ -182,8 +200,9 @@ require_text 'Otherwise confirm the claim is still yours and run `gh pr merge <P
 # Review of the first draft: a lapsed claim keeps its low id, so renewing it
 # blindly steals the item back; and a session that released on opening its PR
 # left a window for another session to claim the issue again.
-require_text 'confirm the claim, then rewrite its first line' "renewal never revives a lapsed claim"
-require_text 'If you already hold a live claim on the item, use it.' "a session never claims the same item twice"
+require_text '`renew <n> <id>` confirms, then rewrites the claim'"'"'s first line' "renewal never revives a lapsed claim"
+require_text 'a lapsed claim prints `lost` and nothing is written' "a lapsed claim is not renewed"
+require_text 'It reuses this session'"'"'s live claim, so a session never claims an item twice.' "a session never claims the same item twice"
 require_text 'once claimed an open PR from a `<branch_prefix>N-` branch now exists' "a claim won just after another session opened its PR stops"
 require_text 'A stop that posted nothing else on the item deletes the claim comment' "a waiting issue is still left without new comments"
 require_text 'Comments that carry the delegator marker do not count as a change' "one session's claims do not wake every other session's poll"
@@ -193,11 +212,13 @@ require_text 'Edit or delete another session'"'"'s claim' "the Never list protec
 # but a label cannot carry a session name or lapse, so it stays a signal and
 # the comment stays the lock.
 require_text '| `progress_label` | `in-progress` |' "a label marks an item an agent is working on"
-require_text 'The claim comment is the lock.' "the label never decides who holds an item"
-require_text "issues/<n>/labels -f 'labels[]=<progress_label>'" "a winning claim adds the label"
-require_text 'If it is yours, add the label' "only the winning session adds the label"
-require_text 'First remove the label (`gh api -X DELETE repos/<owner>/<repo>/issues/<n>/labels/<progress_label>`' "every release removes the label"
-require_text 'gh label create <progress_label>' "a missing label is created"
+require_text 'The claim comment is the lock' "the label never decides who holds an item"
+require_text 'it never decides who holds an item' "the label is only a signal"
+require_script '"repos/$REPO/issues/$n/labels" -f "labels[]=$PROGRESS_LABEL"' "a winning claim adds the label"
+require_text 'The winner adds the label' "only the winning session adds the label"
+require_text 'which removes the label first' "every release removes the label"
+require_script 'gh api -X DELETE "repos/$REPO/issues/$1/labels/$LABEL_PATH"' "the script removes the label through the labels endpoint"
+require_script 'gh label create "$PROGRESS_LABEL"' "a missing label is created"
 require_text 'Never `--force`' "an existing label keeps the human's colour and description"
 require_text '**Stale label.**' "a crashed session's label is cleaned up"
 require_text 'remove the label as **Stale label** in **Claims** says, and keep it as a candidate' "Pick does not skip an issue on a stale label"
@@ -236,14 +257,21 @@ require_text 'returns at most ten lines: the PR URL, the head SHA, the evidence 
 require_text 'with the proposed message shown, **before** the ship subagent is dispatched' "a hand-started Work asks for commit approval before shipping"
 require_text 'Push whatever is staged as a draft PR, through the ship subagent under the Hand-back contract' "Blocked ships through the subagent too"
 # C. Claims bookkeeping goes to one subagent, renewed less often.
-require_text '**Bookkeeping subagent.**' "claims bookkeeping has its own subagent"
-require_text 'returns only comment ids and one word per item: `won`, `lost`, `live` or `lapsed`' "the claims subagent returns ids and one word"
-require_text 'keeps the ids in `claims.json`' "claim ids live in claims.json"
-require_text 'At the start of Work steps 6, 9 and 12' "renewal happens at steps 6, 9 and 12 only"
+require_text '`scripts/delegate-status`, in this skill'"'"'s directory, runs the claims and every fixed query' "claims bookkeeping runs in the script, not the main context"
+reject_regex 'Bookkeeping subagent' "the claims subagent is gone"
+require_text '`claim <n>` prints `won` with the `id`' "a claim prints won or lost"
+require_text 'Keep claim ids in `claims.json`' "claim ids live in claims.json"
+require_text 'Renew only right before a long step, Work steps 6, 8 and 9, Review step 5, Land steps 5 and 7' "renewal happens only before the long steps"
+require_text 'Renew the claim (**Claims**), then dispatch one subagent' "Work renews before the handoff"
+require_text 'renew the claim and dispatch one walkthrough subagent' "Work renews before the walkthrough"
+require_text 'Otherwise renew the claim, then send the implementer subagent' "Work renews before the repair round"
+require_text 'Renew the claim, then hand the actionable threads' "Review renews before its handoff"
+require_text 'Renew the claim, then dispatch one subagent with `subagent_type: general-purpose`, `model: opus`, `run_in_background: true`' "Land renews before its review wait"
+require_text '**Wait for CI.** Renew the claim, then run' "Land renews before its CI wait"
 # D. Pick caches skips across loop passes.
-require_text 'number,title,labels,createdAt,updatedAt' "Pick lists updatedAt"
+require_script 'number,title,labels,createdAt,updatedAt' "Pick lists updatedAt"
 require_text '`pick-cache.json`' "Pick keeps a skip cache"
-require_text 'is re-read (body and comments, through `gh issue view`) **only** when its `updatedAt` in the list is later than the cached value' "a cached skip is re-read only when the issue changed"
+require_text 're-reads a cached issue'"'"'s comments **only** when its `updatedAt` is later than the cached value' "a cached skip is re-read only when the issue changed"
 require_text 'A cached skip is reported once per run' "a cached skip is reported once"
 # E. One issue per session.
 require_text '| `max_worktrees` | 1 |' "max_worktrees defaults to 1"
@@ -347,6 +375,18 @@ for section in '## Parameters' '## Delegator marker' '## Claims' '## Stop rule' 
     fail "the core keeps $section"
   fi
 done
+# The core is what every mode loads, a quiet Watch pass included.
+core_bytes="$(wc -c < "$CORE" | tr -d ' ')"
+if [ "$core_bytes" -le 13000 ]; then
+  pass "the core stays under 13 KB ($core_bytes bytes)"
+else
+  fail "the core stays under 13 KB ($core_bytes bytes)"
+fi
+if [ -x "$SKILL_DIR/scripts/delegate-status" ]; then
+  pass "the bookkeeping script ships executable"
+else
+  fail "the bookkeeping script ships executable"
+fi
 for ref in pick work review watch run land blocked-and-oracle hand-back session; do
   if [ -f "$SKILL_DIR/references/$ref.md" ] && grep -Fq -- "\`references/$ref.md\`" "$CORE"; then
     pass "references/$ref.md exists and the core's index names it"
