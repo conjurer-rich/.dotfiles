@@ -307,6 +307,15 @@ require_text 'the same checks as step 6, limited to the files its fix touched' "
 require_text 'If you changed no files, run nothing: step 7'"'"'s CI wait is the gate.' "Land reruns checks only when its review changed files"
 reject_regex 'Where the self-check or gate requires the complete test suite, run it once' "the implementer no longer runs the full suite by default"
 
+# Land re-reviewed the whole diff the human had just approved. It simplifies
+# the diff, and reviews only what it wrote itself: a conflict resolution.
+require_text 'Run `/simplify` on the diff against `origin/<default branch>`.' "Land simplifies the whole diff"
+require_text 'also run `/code-review` at medium effort on the conflict resolution only' "Land reviews only its own conflict resolution"
+reject_regex 'Run `/code-review` at medium effort and `/simplify` on the diff' "Land no longer re-reviews the approved diff"
+require_text 'Apply only changes that preserve behaviour; do not change any test'"'"'s assertions.' "Land's changes still preserve behaviour"
+require_text 'Do not fix anything that needs a behaviour change: return it instead.' "Land still returns behaviour-changing findings"
+require_text 'If test files changed, run the project'"'"'s `tdd-guardian` agent on the staged diff' "Land runs tdd-guardian only when tests changed"
+
 WALKTHROUGH="$REPO_ROOT/claude/.claude/skills/browser-ux-walkthrough/SKILL.md"
 if grep -Fq -- 'A caller that must not write production code' "$WALKTHROUGH"; then
   pass "the walkthrough lets a no-code caller skip its Fix step"
