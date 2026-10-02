@@ -57,6 +57,9 @@ require_text "$COMMAND" 'No arguments, or `run` → one **Run** pass' "a bare /d
 require_text "$COMMAND" 'Run it as `/loop /delegate` to keep delegating' "the Run pass is built for /loop"
 require_text "$COMMAND" '**Run**, **Watch**, the **Work**' "a Run pass commits without asking"
 require_text "$COMMAND" 'Several sessions can run `/loop /delegate` at once' "the command says parallel sessions are supported"
+require_text "$COMMAND" '- **Session title** (skill):' "the command says the chat is named after the item held"
+require_text "$COMMAND" 'Bash(jq:*)' "the CLI rename's jq call needs no permission prompt"
+require_text "$COMMAND" 'mcp__claude-code-remote__set_session_title' "the cloud rename tool needs no permission prompt"
 
 if grep -E '^!`[^`]*\bgh ' "$COMMAND" | grep -vq '||'; then
   fail "every gh line before the skill loads tolerates a missing gh"
