@@ -258,6 +258,28 @@ require_text 'Put a model identifier in anything pushed' "no model identifier is
 require_text '`git stash`, `git commit --amend` on a pushed branch, or `git branch -D`' "stash, amend and branch -D stay forbidden"
 require_text 'One round only.' "one repair round only"
 
+# Several /loop /delegate sessions in the sidebar or the /resume picker all
+# read "/delegate", so the human could not tell which one held which issue.
+# The session names its chat after the item it holds, through the one
+# mechanism each host offers, and a failed rename never stops a run.
+require_text '## Session title' "the skill has a Session title section"
+require_text 'the two never mix' "the claims session name and the chat title are kept apart"
+require_text '| **Work** step 2, once the claim on issue N wins | `#N <issue title>` |' "Work names the chat after the issue"
+require_text '| **Review** step 1, once the claim on PR P wins | `Review PR #P <PR title>` |' "Review names the chat after the PR"
+require_text '| **Land** step 1, once the claim on PR P wins | `Land PR #P <PR title>` |' "Land names the chat after the PR"
+require_text '| A **Watch** or **Run** pass ends holding no claim | `/delegate watching <owner>/<repo>` |' "an idle pass names the chat as watching"
+require_text 'Once the claim is yours, set the **Session title** to `#N <issue title>`.' "Work sets the title once its claim wins"
+require_text 'Once the claim is yours, set the **Session title** to `Review PR #P <PR title>`.' "Review sets the title once its claim wins"
+require_text 'Once the claim is yours, set the **Session title** to `Land PR #P <PR title>`.' "Land sets the title once its claim wins"
+require_text 'so set the **Session title** to its watching form' "Watch and Run set the watching title at the end of a pass"
+require_text 'and only when the new title differs from `title` in `run-state.json`' "an unchanged title costs no call"
+require_text 'never stops a run: the title is a convenience' "a failed rename never stops a run"
+require_text 'The `set_session_title` tool of the `claude-code-remote` MCP server' "a cloud session renames through the set_session_title tool"
+require_text '`CLAUDE_CODE_SESSION_ID` is a different id and is not it' "the cloud rename does not use the CLI session id"
+require_text 'customTitle:$t,sessionId:$s' "a CLI session appends the custom-title record /rename writes"
+require_text '>> ~/.claude/projects/*/"$CLAUDE_CODE_SESSION_ID".jsonl' "the record goes to this session's transcript"
+reject_regex 'Skill tool.*/rename|run `/rename`[^.]*\.$' "the skill never tells the model to run /rename itself"
+
 WALKTHROUGH="$REPO_ROOT/claude/.claude/skills/browser-ux-walkthrough/SKILL.md"
 if grep -Fq -- 'A caller that must not write production code' "$WALKTHROUGH"; then
   pass "the walkthrough lets a no-code caller skip its Fix step"

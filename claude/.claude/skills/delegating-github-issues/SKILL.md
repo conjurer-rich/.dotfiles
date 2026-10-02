@@ -49,7 +49,7 @@ Every subagent writes its full report to a file under the scratchpad directory (
 
 The contract applies to every subagent this skill dispatches: bootstrap, implementer, the three independent checks, walkthrough, ship, claims, and the Blocked comment. Unless a step says otherwise, a dispatch is `subagent_type: general-purpose` at its default model with `run_in_background: false`.
 
-**Scratch layout.** One directory per run, `<scratchpad>/delegator/<session name>/`: `run-state.json` (the **Stop rule** counters), `claims.json` (**Claims**), `pick-cache.json` (**Pick**), and per issue `<N>/implementer.md`, `<N>/checks/<check>.md`, `<N>/walkthrough.md`, `<N>/commit-message.md`, `<N>/pr-body.md`, `<N>/ship.md`, and screenshots at `<N>/<surface>-<theme>-<before|after>.png`. Every brief names the files it must write.
+**Scratch layout.** One directory per run, `<scratchpad>/delegator/<session name>/`: `run-state.json` (the **Stop rule** counters and the **Session title** state), `claims.json` (**Claims**), `pick-cache.json` (**Pick**), and per issue `<N>/implementer.md`, `<N>/checks/<check>.md`, `<N>/walkthrough.md`, `<N>/commit-message.md`, `<N>/pr-body.md`, `<N>/ship.md`, and screenshots at `<N>/<surface>-<theme>-<before|after>.png`. Every brief names the files it must write.
 
 **The delegator never enters a worktree.** The delegator stays in the main checkout for the whole run. It runs no `git` command inside a worktree other than `git worktree add`, `git worktree list`, `git worktree remove`, `git worktree prune` and `git -C <path> status --porcelain` for Reclaim. Every subagent that touches a worktree is briefed with the worktree's absolute path and the instruction "work only inside `<path>`". Do not use the Agent tool's `isolation: "worktree"` for these dispatches: it gives the subagent a fresh temporary worktree of its own, not the delegated one, so the implementer's staged work and the ship subagent's push would land in different places. The worktree isolation guard that refused `cd … && git`, `git -C`, heredocs naming git, loops and `agent-browser eval` in the aborted run never fires on a delegator that issues none of them.
 
@@ -59,7 +59,7 @@ Several delegator sessions can run at once, and all post through the same `gh` l
 
 The claim comment is the lock. The `<progress_label>` label is the signal for humans: a session adds it when its claim wins and removes it when it releases, so the issue list shows what an agent is working on without anyone opening the comments. The label never decides anything: a crashed session leaves its label behind, and only the live-claims query below says whether a claim is live.
 
-**Session name.** Before its first claim, a session names itself with 8 random hex characters and uses that name for every claim it makes.
+**Session name.** Before its first claim, a session names itself with 8 random hex characters and uses that name for every claim it makes. The name is for claims; the chat name the human sees is the **Session title** below, and the two never mix.
 
 **Bookkeeping subagent.** The delegator runs none of the `gh api` calls below itself: in the aborted run they were thirty-plus calls in the main context. One lightweight `general-purpose` subagent per run (model `haiku` is fine) does claim, confirm, renew and release. Its first brief carries the session name, owner/repo, `claim_ttl` in seconds, the commands in this section and the **Hand-back contract**; each later request (`SendMessage` to the same subagent, never a fresh one) carries the item number, the action and the comment id. It returns only comment ids and one word per item: `won`, `lost`, `live` or `lapsed`. The delegator keeps the ids in `claims.json` in the run's scratch directory, keyed by item number, and reads nothing else about a claim.
 
@@ -102,11 +102,37 @@ A Land waiting on a background task has not stopped, so its claim and its label 
 
 **Stale label.** An item that carries `<progress_label>` with no live claim was left by a session that crashed or was restarted. Any session that finds one while classifying (Pick step 3, Watch step 3) removes the label, with the same command Release uses, and then treats the item as free. The label is not a claim, so this does not touch another session's claim comment.
 
+## Session title
+
+The chat's name is how the human finds one delegator session among several, in the Claude Code on the web sidebar, the `/resume` picker and the terminal title, so a session names itself after the item it holds. The title changes at these moments, and only when the new title differs from `title` in `run-state.json`:
+
+| Moment | Title |
+|---|---|
+| **Work** step 2, once the claim on issue N wins | `#N <issue title>` |
+| **Review** step 1, once the claim on PR P wins | `Review PR #P <PR title>` |
+| **Land** step 1, once the claim on PR P wins | `Land PR #P <PR title>` |
+| A **Watch** or **Run** pass ends holding no claim | `/delegate watching <owner>/<repo>` |
+
+Cut the item's title at a word boundary with `…` so the whole stays within 60 characters. A Work, Review or Land the human started by hand keeps its item's title when it stops, and so does a run that trips the **Stop rule** or goes to **Blocked**: the title still says where the staged work is. Only a Watch or Run pass sets the watching form, and only at its end.
+
+Set it with one call, counted in `tool_calls`, and write the new title to `run-state.json`. A rename that fails is reported in one line of the pass report and never stops a run: the title is a convenience.
+
+- **Claude Code on the web.** The `set_session_title` tool of the `claude-code-remote` MCP server, whenever it is in the tool list. Its `session_id` is the `ccr.id` that `get_session` returns when called once per run with no arguments; keep it in `run-state.json` as `ccr_session_id`. That is the id the sidebar knows; `CLAUDE_CODE_SESSION_ID` is a different id and is not it.
+- **The CLI.** No tool renames a session and a skill cannot run `/rename`. `/rename` itself appends a `custom-title` record to the session transcript, and Claude Code picks one up that another process appended the next time it reads the end of its transcript (after about 32 KB of its own writes, or at a compaction), so append the same record:
+
+  ```bash
+  jq -nc --arg t "<title>" --arg s "$CLAUDE_CODE_SESSION_ID" \
+    '{type:"custom-title",customTitle:$t,sessionId:$s}' \
+    >> ~/.claude/projects/*/"$CLAUDE_CODE_SESSION_ID".jsonl
+  ```
+
+  `CLAUDE_CODE_SESSION_ID` is set in every Claude Code session and exactly one transcript carries that name, so the glob expands to the one file. The redirect fails with `ambiguous redirect` when it does not; report that and carry on.
+
 ## Stop rule
 
 A run stops, releases its claims and reports when any of these holds: the harness reports context use above 60 %, the run has made more than 150 tool calls in the main session, or the same isolation-guard refusal has occurred three times. The report names the step reached, the worktree path, what is staged there and what the next session should do first. Staged work stays in the worktree. A `/loop` wakeup after such a stop starts a fresh Run; it does not resume the stopped Work.
 
-The counters live in `run-state.json` in the run's scratch directory: `tool_calls` (the delegator's own calls in the main session; a subagent's calls do not count), `guard_refusals` (keyed by the refused command), `step`, `issue` and `worktree`. The delegator rewrites the file at the start of every numbered step and after every refusal, so a wakeup can read where the stopped run got to without replaying it. Three refusals of the same command mean the command is wrong for this environment, not that a fourth phrasing will pass.
+The counters live in `run-state.json` in the run's scratch directory: `tool_calls` (the delegator's own calls in the main session; a subagent's calls do not count), `guard_refusals` (keyed by the refused command), `step`, `issue`, `worktree`, and the **Session title** state `title` and `ccr_session_id`. The delegator rewrites the file at the start of every numbered step and after every refusal, so a wakeup can read where the stopped run got to without replaying it. Three refusals of the same command mean the command is wrong for this environment, not that a fourth phrasing will pass.
 
 ### Running in a cloud container
 
@@ -139,7 +165,7 @@ Advice to the human, not instructions to the delegator:
 
    > Delegation paused: <k> delegated worktrees active (limit <max_worktrees>) and <m> open PRs (limit <max_open_prs>). Retry when one closes.
 
-   **Claim.** Claim the issue as **Claims** describes. If another session holds it, or once claimed an open PR from a `<branch_prefix>N-` branch now exists (a session that just opened it has released its claim), stop; when Pick started this Work, return to Pick's next candidate instead. Every stop from here on releases the claim.
+   **Claim.** Claim the issue as **Claims** describes. If another session holds it, or once claimed an open PR from a `<branch_prefix>N-` branch now exists (a session that just opened it has released its claim), stop; when Pick started this Work, return to Pick's next candidate instead. Every stop from here on releases the claim. Once the claim is yours, set the **Session title** to `#N <issue title>`.
 
 3. **Acceptance criteria.** Read the body. Acceptance criteria are present if the body has a heading matching `/acceptance criteria/i` followed by a numbered or bulleted list. Use them for the rest of the run.
 
@@ -188,7 +214,7 @@ Advice to the human, not instructions to the delegator:
 
 ### Review `#PR`
 
-1. Confirm the PR head branch starts with `<branch_prefix>`; otherwise say this PR was not opened by a delegated run and stop. Then claim the PR (**Claims**); if another session holds it, stop.
+1. Confirm the PR head branch starts with `<branch_prefix>`; otherwise say this PR was not opened by a delegated run and stop. Then claim the PR (**Claims**); if another session holds it, stop. Once the claim is yours, set the **Session title** to `Review PR #P <PR title>`.
 2. Find its worktree: `git worktree list --porcelain | grep -B2 'branch refs/heads/<head branch>'`. If none exists (another machine or session opened the PR), `git fetch origin <head branch>`, then `git worktree add <path> <head branch>`, then dispatch the bootstrap subagent as **Work** step 5 does. Never enter it: every later command against it runs in a subagent briefed with its path.
 3. Fetch unresolved threads and top-level comments:
 
@@ -239,7 +265,7 @@ One pass over every open delegated PR, built to run under `/loop`. Watch holds n
      That is: the human marked it ready at least once and has not returned it to draft. A PR opened as non-draft has no ready event and is never Ready. `latest` tells Land whether a commit arrived after the last Ready.
    - **Idle**: everything else. Never touched.
 4. Run **Review** on each Needs-review PR, committing without asking. Then run **Land** on each Ready PR. Work oldest `createdAt` first, one PR at a time.
-5. Report one line per PR: number, state, and the action taken, `claimed by <session>`, or `idle`. Name idle non-draft PRs so the human sees them.
+5. Report one line per PR: number, state, and the action taken, `claimed by <session>`, or `idle`. Name idle non-draft PRs so the human sees them. The pass holds no claim now, so set the **Session title** to its watching form.
 6. Under `/loop`, schedule the next pass 1200–1800 seconds out. Land's review and CI wait run in the background, and the background task that finishes wakes the loop, so a pass never polls to babysit them. To notice a Ready click or a new comment sooner, leave a background poll running between passes. It checks each delegated PR's draft state and unanswered comments, plus any new delegated PR, about once a minute, and exits on the first change. Comments that carry the delegator marker do not count as a change.
 
 ### Run
@@ -249,7 +275,7 @@ One unattended pass: **Watch**, then **Pick** and **Work**. Built to run under `
 1. **Watch.** Run **Watch** steps 1–4.
 2. **Budget.** Count as in **Work** step 2's **Count**. If either count is at its limit, skip Pick without commenting: the paused comment would repeat on every pass. Go to step 4.
 3. **Pick**, then **Work** the result, which commits without asking (**Work** step 10). One Run pass works at most one issue through to its PR before the loop reschedules; it never picks a second issue in the same pass, whatever `max_worktrees` allows. When Work stops because the issue waits on the human (a question, or criteria awaiting a 👍), the pass goes on to step 4. A later pass picks the issue up once the human answers. A pass that trips the **Stop rule** reports and ends; the next wakeup starts a fresh Run.
-4. **Report** Watch step 5's lines, then one line for the issue: its number and the outcome (the PR URL, `waiting on the human`, `blocked`, `over budget`, or `no eligible issue`).
+4. **Report** Watch step 5's lines, then one line for the issue: its number and the outcome (the PR URL, `waiting on the human`, `blocked`, `over budget`, or `no eligible issue`). The pass holds no claim now, so set the **Session title** to its watching form; a pass that stopped at **Blocked** keeps the issue's title.
 5. Under `/loop`, schedule the next pass as **Watch** step 6 does. The background poll also exits when a `<label>` issue is opened or gains a comment.
 
 ### Land `#PR`
@@ -265,7 +291,7 @@ gh api repos/<owner>/<repo>/issues/<PR>/comments --paginate \
 
 When the SHA in it equals the PR's current `headRefOid`, Land already verified this head: after step 3, go to step 7.
 
-1. **Eligibility.** If `land` is off, say so and stop. The head branch must start with `<branch_prefix>`; if not, say so and stop. Then claim the PR (**Claims**); if another session holds it, stop. The PR must be **Ready** as **Watch** step 3 defines it; if not, say so and stop. Unless the land marker names the current head, `latest` in that query must be a `ReadyForReviewEvent`. A commit after the human's last Ready was not approved, so go to **Bail-out** with the reason `commits after Ready`.
+1. **Eligibility.** If `land` is off, say so and stop. The head branch must start with `<branch_prefix>`; if not, say so and stop. Then claim the PR (**Claims**); if another session holds it, stop. The PR must be **Ready** as **Watch** step 3 defines it; if not, say so and stop. Once the claim is yours, set the **Session title** to `Land PR #P <PR title>`. Unless the land marker names the current head, `latest` in that query must be a `ReadyForReviewEvent`. A commit after the human's last Ready was not approved, so go to **Bail-out** with the reason `commits after Ready`.
 2. **Worktree.** Find or create the branch's worktree as in **Review** step 2.
 3. **Open review first.** If any thread or top-level comment needs an answer, run **Review** steps 4–6, committing without asking. The human marked the PR ready with it open, so a clear request is a request to address. An ambiguous comment gets its single question and then **Bail-out** with the reason `question pending`.
 4. **Bring up to date.** Dispatch one sync subagent (`general-purpose`, default model, `run_in_background: false`) briefed with the worktree path, "work only inside `<path>`", the Hand-back contract and these instructions. A review interrupted by a restart leaves staged changes: discard them first (`git restore --staged --worktree .`). Then `git fetch origin`, then `git merge --no-edit origin/<default branch>`. Resolve a conflict in place only when it is one of these textual kinds:
