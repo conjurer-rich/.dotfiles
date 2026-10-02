@@ -1,5 +1,16 @@
 # Changelog
 
+## 4.24.0
+
+### Minor Changes
+
+- cdcb374: `delegating-github-issues` no longer exhausts the delegator's context. The delegator never enters a worktree (`EnterWorktree` is gone; the worktree is created from the main checkout and every subagent is briefed with its path), every mechanical step (bootstrap, walkthrough, commit, evidence, push, PR, issue comments, claims bookkeeping) runs in a subagent under a new **Hand-back contract** (a file plus at most ten lines back, never a diff, snapshot or log), claims renew at Work steps 6, 9 and 12 only, Pick caches skipped issues in `pick-cache.json` and re-reads one only when its `updatedAt` moved, `max_worktrees` defaults to 1 with parallelism from more sessions, and a **Stop rule** ends a run at 60 % context, 150 main-session tool calls or the third identical isolation-guard refusal. The `/delegate` command follows. New `claude/.claude/hooks/stop-hook-git-check.sh` carries the commit-and-push stop hook with an exemption for a `.delegator/` marker or `DELEGATOR_RUN=1`.
+
+### Patch Changes
+
+- 5173fc6: The craft plugin manifest (`claude/.claude/.claude-plugin/plugin.json`) now carries the fork's release version. Claude Code detects a marketplace plugin update from that field, and it had been pinned at 4.12.2 since the manifest was added, so installed copies were never offered newer releases. `release.yml` syncs it on every version bump through `fork/sync-plugin-version.mjs`, and a test fails when the two drift.
+- 42b66d0: Fix the release workflow: changesets/action execs its `version` input without a shell, so the `pnpm changeset version && node …` chain from the manifest-sync change handed changesets a literal `&&` and every release run since failed before versioning anything. The workflow now runs `bash fork/version.sh`, which does both steps. Also register the commit-and-push stop hook (`claude/.claude/hooks/stop-hook-git-check.sh`, with its delegator exemption) as a `Stop` hook in the stowed `settings.json`.
+
 ## 4.23.0
 
 ### Minor Changes

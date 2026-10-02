@@ -1,5 +1,0 @@
----
-"@conjurer-rich/dotfiles": minor
----
-
-`delegating-github-issues` no longer exhausts the delegator's context. The delegator never enters a worktree (`EnterWorktree` is gone; the worktree is created from the main checkout and every subagent is briefed with its path), every mechanical step (bootstrap, walkthrough, commit, evidence, push, PR, issue comments, claims bookkeeping) runs in a subagent under a new **Hand-back contract** (a file plus at most ten lines back, never a diff, snapshot or log), claims renew at Work steps 6, 9 and 12 only, Pick caches skipped issues in `pick-cache.json` and re-reads one only when its `updatedAt` moved, `max_worktrees` defaults to 1 with parallelism from more sessions, and a **Stop rule** ends a run at 60 % context, 150 main-session tool calls or the third identical isolation-guard refusal. The `/delegate` command follows. New `claude/.claude/hooks/stop-hook-git-check.sh` carries the commit-and-push stop hook with an exemption for a `.delegator/` marker or `DELEGATOR_RUN=1`.
