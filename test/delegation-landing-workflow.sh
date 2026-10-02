@@ -296,6 +296,17 @@ require_text 'The tier is a claim too' "the tier S reviewer re-measures the tier
 require_text '**Tier M or L.** Dispatch these three read-only checks in parallel' "tier M and L keep the three checks"
 require_text 'The RED-before-GREEN evidence goes in the PR body at every tier.' "tier S keeps TDD evidence in the PR"
 
+# Local suites duplicated CI: the implementer, the repair round and Land each
+# ran the complete suite, and CI ran it twice more. CI is the full-suite gate;
+# a project can still ask for a local run.
+require_text '| `local_full_suite` | off |' "the local full suite is off by default"
+require_text 'run lint, typecheck, build and the tests of the packages the diff touches, plus the mutation gate on the diff' "the implementer runs the affected scope"
+require_text 'Do not run the complete test suite: CI runs it on the PR.' "the implementer leaves the full suite to CI"
+require_text 'When `local_full_suite` is on, the brief adds:' "a project can ask for the local full suite"
+require_text 'the same checks as step 6, limited to the files its fix touched' "the repair round checks only what the fix touched"
+require_text 'If you changed no files, run nothing: step 7'"'"'s CI wait is the gate.' "Land reruns checks only when its review changed files"
+reject_regex 'Where the self-check or gate requires the complete test suite, run it once' "the implementer no longer runs the full suite by default"
+
 WALKTHROUGH="$REPO_ROOT/claude/.claude/skills/browser-ux-walkthrough/SKILL.md"
 if grep -Fq -- 'A caller that must not write production code' "$WALKTHROUGH"; then
   pass "the walkthrough lets a no-code caller skip its Fix step"
