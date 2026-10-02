@@ -33,7 +33,7 @@ Parse `$ARGUMENTS`:
 
 ## Procedure
 
-Load the `delegating-github-issues` skill and follow the named entry point with the parameters above.
+Load the `delegating-github-issues` skill and follow the named entry point with the parameters above, reading only the reference files its **Entry points** index names for that mode.
 
 These rules apply in every project, alongside its Project rules:
 

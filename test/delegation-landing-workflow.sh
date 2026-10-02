@@ -9,8 +9,16 @@ set -e
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-SKILL="$REPO_ROOT/claude/.claude/skills/delegating-github-issues/SKILL.md"
+SKILL_DIR="$REPO_ROOT/claude/.claude/skills/delegating-github-issues"
+CORE="$SKILL_DIR/SKILL.md"
 FAILURES=0
+
+# The skill is a short core plus one reference file per entry point. The
+# text guards below read them as one document; the structure guards after
+# them check what lives where.
+SKILL="$(mktemp)"
+trap 'rm -f "$SKILL"' EXIT
+cat "$CORE" "$SKILL_DIR"/references/*.md > "$SKILL"
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -58,7 +66,7 @@ require_text '`gh pr ready` runs only with `--undo`' "only the human marks a PR 
 reject_regex 'merge a PR, resolve a review thread' "the unconditional never-merge line is gone"
 
 # Task 2: Watch
-require_text '### Watch' "Watch entry point exists"
+require_text '# Watch' "Watch entry point exists"
 require_text 'READY_FOR_REVIEW_EVENT' "Ready is read from the PR timeline"
 # timelineItems' totalCount ignores itemTypes and counts every timeline item,
 # so a gate on it calls every PR ready. filteredCount is the filtered count.
@@ -77,7 +85,7 @@ require_text 'the background task that finishes wakes the loop' "a Land waiting 
 reject_regex '270 seconds' "Watch no longer polls fast to babysit CI"
 
 # Task 3: Land
-require_text '### Land `#PR`' "Land entry point exists"
+require_text '# Land `#PR`' "Land entry point exists"
 require_text 'If `land` is off, say so and stop.' "Land refuses when land is off"
 require_text 'git merge --no-edit origin/<default branch>' "conflicts are resolved by merging main in"
 require_text '<!-- delegator land: reviewed <sha> -->' "Land records the SHA it verified"
@@ -146,7 +154,7 @@ require_text 'On every path out of this step except **Blocked**' "the UX walkthr
 require_text 'the PR already exists, so **Blocked** does not apply' "a human-started Review never opens a second PR"
 
 # Run: one unattended pass of Watch then Pick and Work, built for /loop.
-require_text '### Run' "the skill has a Run entry point"
+require_text '# Run' "the skill has a Run entry point"
 require_text 'When **Run** started this Work, commit without asking' "Work under Run commits without asking"
 require_text 'skip Pick without commenting' "an over-budget Run pass never posts a paused comment"
 require_text 'a Run pass never waits on the human' "Run never blocks on a human answer"
@@ -211,7 +219,7 @@ require_text 'It runs no `git` command inside a worktree other than `git worktre
 require_text 'then dispatch the bootstrap subagent as **Work** step 5 does. Never enter it' "Review never enters the worktree either"
 require_text 'work only inside `<path>`' "subagents are briefed with the worktree path"
 # B. Mechanical steps run in subagents under one hand-back contract.
-require_text '## Hand-back contract' "the skill has a Hand-back contract section"
+require_text '# Hand-back contract' "the skill has a Hand-back contract section"
 require_text 'returns to the delegator **at most ten lines**' "a subagent returns at most ten lines"
 require_text 'It never returns a diff, a screenshot, a browser snapshot, a test log, or a report body.' "a subagent never returns its output body"
 require_text 'The delegator never runs `git diff` itself' "the delegator never reads a diff"
@@ -247,7 +255,7 @@ require_text 'context use above 60 %, the run has made more than 150 tool calls 
 require_text '`run-state.json`' "the stop counters live in run-state.json"
 require_text 'A `/loop` wakeup after such a stop starts a fresh Run; it does not resume the stopped Work.' "a wakeup after a stop starts fresh"
 # G. Cloud container guidance.
-require_text '### Running in a cloud container' "the skill has cloud container guidance"
+require_text '## Running in a cloud container' "the skill has cloud container guidance"
 require_text 'only the GitHub connector attached' "the guidance names the connector cost"
 require_text '`.delegator/` marker directory or `DELEGATOR_RUN=1`' "the stop hook exemption is named"
 # H. Never-rules that the rewrite must keep.
@@ -328,6 +336,31 @@ require_text 'leave it running for step 9'"'"'s re-walk' "the stack stays up for
 require_text 're-walks them on the stack it left running' "the re-walk does not boot the stack again"
 reject_regex 'it boots and signs in per the Recipe, re-walks' "the repair round no longer reboots the stack"
 require_text 'send the walkthrough subagent one message to stop the stack' "a run never leaves the stack running"
+
+# Progressive disclosure. Every mode loaded the whole 35-50 KB skill, a quiet
+# Watch pass included. The core keeps what every mode needs; each entry point
+# lives in its own reference file, which the core's index names.
+for section in '## Parameters' '## Delegator marker' '## Claims' '## Stop rule' '## Entry points' '## PR body contract' '## Never'; do
+  if grep -Fxq -- "$section" "$CORE"; then
+    pass "the core keeps $section"
+  else
+    fail "the core keeps $section"
+  fi
+done
+for ref in pick work review watch run land blocked-and-oracle hand-back session; do
+  if [ -f "$SKILL_DIR/references/$ref.md" ] && grep -Fq -- "\`references/$ref.md\`" "$CORE"; then
+    pass "references/$ref.md exists and the core's index names it"
+  else
+    fail "references/$ref.md exists and the core's index names it"
+  fi
+done
+for entry in '### Pick' '### Work `#N`' '### Review `#PR`' '### Watch' '### Run' '### Land `#PR`' '### Blocked'; do
+  if grep -Fxq -- "$entry" "$CORE"; then
+    fail "the core no longer carries $entry"
+  else
+    pass "the core no longer carries $entry"
+  fi
+done
 
 WALKTHROUGH="$REPO_ROOT/claude/.claude/skills/browser-ux-walkthrough/SKILL.md"
 if grep -Fq -- 'A caller that must not write production code' "$WALKTHROUGH"; then
