@@ -31,6 +31,10 @@ Parse `$ARGUMENTS`:
 - `land #<n>` or `land <n>` → **Land** PR `n`.
 - Anything else → print the six forms above and stop.
 
+## Model
+
+The `/loop /delegate` session mostly routes: it runs `delegate-status`, reads verdict lines and dispatches subagents, and it writes no production code. It can run on a cheaper model than the work it hands out; choose one with `/model` before starting the loop. The implementer (Work step 6) and Land's review subagent (Land step 5) keep `model: opus` whatever the session runs on, and every other subagent runs at its own default. This is a recommendation for the human: the command pins no model, so a session that needs judgement it cannot give can be switched without editing anything.
+
 ## Procedure
 
 Load the `delegating-github-issues` skill and follow the named entry point with the parameters above, reading only the reference files its **Entry points** index names for that mode.
