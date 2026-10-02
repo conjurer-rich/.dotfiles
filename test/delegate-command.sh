@@ -60,6 +60,7 @@ require_text "$COMMAND" 'Several sessions can run `/loop /delegate` at once' "th
 require_text "$COMMAND" '- **Session title** (skill):' "the command says the chat is named after the item held"
 require_text "$COMMAND" 'Bash(jq:*)' "the CLI rename's jq call needs no permission prompt"
 require_text "$COMMAND" 'mcp__claude-code-remote__set_session_title' "the cloud rename tool needs no permission prompt"
+require_text "$COMMAND" '`tier_small_max_lines` 150, `tier_small_max_packages` 1, no `risk_paths`' "the command lists the size-tier defaults"
 
 if grep -E '^!`[^`]*\bgh ' "$COMMAND" | grep -vq '||'; then
   fail "every gh line before the skill loads tolerates a missing gh"

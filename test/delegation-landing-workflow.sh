@@ -127,7 +127,7 @@ require_text 'The implementer'"'"'s returns are claims, not evidence.' "the impl
 require_text 'loads `acceptance-review`' "acceptance criteria are checked independently"
 require_text 'The project'"'"'s whole-PR review agent' "the whole diff is reviewed before the PR opens"
 require_text 'do **not** run its Fix step' "the delegator never applies walkthrough fixes itself"
-require_text 'Then re-run `tdd-guardian` and every check that reported a blocking finding, as step 7 dispatches them.' "the repair round is re-checked"
+require_text 'Then re-run the checks for the tier: at tier M or L, `tdd-guardian` and every check that reported a blocking finding, as step 7 dispatches them; at tier S, the one reviewer.' "the repair round is re-checked"
 require_text 'edit this comment to change them, then react' "derived acceptance criteria wait for the human"
 require_text 'including any glossary or vocabulary check' "the gate's glossary step is not dropped"
 reject_regex 'gate'"'"'s steps 1–5' "the pre-PR gate is not truncated"
@@ -217,7 +217,7 @@ require_text 'It never returns a diff, a screenshot, a browser snapshot, a test 
 require_text 'The delegator never runs `git diff` itself' "the delegator never reads a diff"
 require_text 'Write to `<scratch>/<N>/implementer.md`: (a) the list of files changed' "the implementer report goes to a file"
 require_text 'its full report goes to `<scratch>/<N>/checks/<process|acceptance|whole-diff>.md`' "the three checks report to files"
-require_text '   - **Process.** The project'"'"'s `tdd-guardian` agent.' "the tdd-guardian check is unchanged"
+require_text '     - **Process.** The project'"'"'s `tdd-guardian` agent.' "the tdd-guardian check is unchanged"
 require_text 'dispatch one walkthrough subagent' "the walkthrough runs in a subagent"
 require_text 'The delegator never runs `agent-browser`' "the delegator never drives the browser"
 require_text 'The re-walk never runs in the main session.' "the repair-round re-walk runs in a subagent"
@@ -279,6 +279,22 @@ require_text '`CLAUDE_CODE_SESSION_ID` is a different id and is not it' "the clo
 require_text 'customTitle:$t,sessionId:$s' "a CLI session appends the custom-title record /rename writes"
 require_text '>> ~/.claude/projects/*/"$CLAUDE_CODE_SESSION_ID".jsonl' "the record goes to this session's transcript"
 reject_regex 'Skill tool.*/rename|run `/rename`[^.]*\.$' "the skill never tells the model to run /rename itself"
+
+# Size tiers. A +83-line fix and a +2.5k-line feature went through the same
+# three independent checks. A small diff off the risk paths gets one
+# independent reviewer that also checks the criteria; it never gets none.
+require_text '| `tier_small_max_lines` | 150 |' "tier S has a line threshold"
+require_text '| `tier_small_max_packages` | 1 |' "tier S has a package threshold"
+require_text '| `risk_paths` | none |' "risk paths default to none"
+require_text 'A diff that touches any `risk_paths` glob is never tier S.' "a risk path is never tier S"
+require_text '`git diff --cached --shortstat`' "the tier is measured from the staged diff"
+require_text 'Record the tier and its measurement in the PR body'"'"'s **Summary**.' "the tier is recorded in the Summary"
+require_text '**Tier S.** Dispatch one independent reviewer' "tier S gets one reviewer"
+require_text 'checks each acceptance criterion against the tests' "the tier S reviewer checks the criteria"
+require_text 'No tier skips independent verification.' "no tier skips verification"
+require_text 'The tier is a claim too' "the tier S reviewer re-measures the tier"
+require_text '**Tier M or L.** Dispatch these three read-only checks in parallel' "tier M and L keep the three checks"
+require_text 'The RED-before-GREEN evidence goes in the PR body at every tier.' "tier S keeps TDD evidence in the PR"
 
 WALKTHROUGH="$REPO_ROOT/claude/.claude/skills/browser-ux-walkthrough/SKILL.md"
 if grep -Fq -- 'A caller that must not write production code' "$WALKTHROUGH"; then
