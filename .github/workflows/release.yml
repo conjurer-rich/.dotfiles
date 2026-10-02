@@ -39,9 +39,11 @@ jobs:
         id: changesets
         uses: changesets/action@v1
         with:
-          # Sync the plugin manifest in the same commit: Claude Code detects a
-          # marketplace update from plugin.json's version, not from git.
-          version: pnpm changeset version && node fork/sync-plugin-version.mjs
+          # fork/version.sh runs `changeset version` and then syncs the plugin
+          # manifest in the same commit: Claude Code detects a marketplace update
+          # from plugin.json's version, not from git. It must be one word: the
+          # action execs this input without a shell, so `a && b` does not work.
+          version: bash fork/version.sh
           commit: 'chore: version packages'
           title: 'chore: version packages'
         env:
