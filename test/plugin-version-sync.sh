@@ -43,11 +43,25 @@ else
 fi
 
 # 2. The release workflow runs the sync in the same step as changeset version,
-#    so the "chore: version packages" PR carries both bumps.
-if grep -Fq 'version: pnpm changeset version && node fork/sync-plugin-version.mjs' "$WORKFLOW"; then
-  pass "release.yml syncs the manifest after changeset version"
+#    so the "chore: version packages" PR carries both bumps. changesets/action
+#    execs its `version` input without a shell (it splits on whitespace), so
+#    the input must be one command, not an `a && b` chain: runs 27 and 28
+#    failed with "Too many arguments passed to changesets" on exactly that.
+VERSION_SCRIPT="$REPO_ROOT/fork/version.sh"
+if grep -Fq 'version: bash fork/version.sh' "$WORKFLOW"; then
+  pass "release.yml versions through fork/version.sh"
 else
-  fail "release.yml syncs the manifest after changeset version"
+  fail "release.yml versions through fork/version.sh"
+fi
+if grep -Eq '^\s*version: .*&&' "$WORKFLOW"; then
+  fail "the version input is one command, not a shell chain"
+else
+  pass "the version input is one command, not a shell chain"
+fi
+if grep -Fq 'pnpm changeset version' "$VERSION_SCRIPT" && grep -Fq 'node fork/sync-plugin-version.mjs' "$VERSION_SCRIPT"; then
+  pass "fork/version.sh runs changeset version then the sync"
+else
+  fail "fork/version.sh runs changeset version then the sync"
 fi
 
 # 3. The sync script rewrites the version line and nothing else, and is

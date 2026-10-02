@@ -23,8 +23,10 @@ What changed, for someone installing the fork.
 ```
 
 `release.yml` tags `v<fork/package.json version>`, which `install-rich.sh`
-resolves as the latest release. The same run copies that version into the
-craft plugin manifest (`claude/.claude/.claude-plugin/plugin.json`): Claude
+resolves as the latest release. Its `version` command is `bash fork/version.sh`:
+changesets/action execs that input without a shell, so it has to be one
+command, and the script runs `changeset version` and then copies the new
+version into the craft plugin manifest (`claude/.claude/.claude-plugin/plugin.json`): Claude
 Code offers a marketplace plugin update when the manifest version changes,
 not when commits land, so a manifest left behind pins installed copies to an
 old release. `test/plugin-version-sync.sh` fails when the two drift.
