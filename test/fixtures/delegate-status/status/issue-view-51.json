@@ -1,0 +1,13 @@
+{
+  "number": 51,
+  "title": "Unlabelled",
+  "labels": [
+    {
+      "name": "p1"
+    }
+  ],
+  "createdAt": "2026-09-01T09:00:00Z",
+  "updatedAt": "2026-09-01T09:00:00Z",
+  "body": "x",
+  "state": "OPEN"
+}

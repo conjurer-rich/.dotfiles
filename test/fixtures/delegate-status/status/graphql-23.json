@@ -1,0 +1,43 @@
+{
+  "data": {
+    "repository": {
+      "pullRequest": {
+        "isDraft": true,
+        "headRefOid": "h23",
+        "reviewThreads": {
+          "nodes": [
+            {
+              "id": "T9",
+              "isResolved": false,
+              "comments": {
+                "nodes": [
+                  {
+                    "databaseId": 631,
+                    "body": "Please fix",
+                    "author": {
+                      "login": "rich",
+                      "__typename": "User"
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "reviews": {
+          "nodes": []
+        },
+        "ready": {
+          "filteredCount": 0
+        },
+        "latest": {
+          "nodes": [
+            {
+              "__typename": "PullRequestCommit"
+            }
+          ]
+        }
+      }
+    }
+  }
+}

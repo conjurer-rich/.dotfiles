@@ -1,7 +1,7 @@
 ---
 description: Keep delegating under /loop (watch delegated PRs, then pick and work the next issue), or work a labelled GitHub issue to a reviewable PR, pick the next one, address review comments, watch delegated PRs, or land a PR marked ready
 argument-hint: "[run] | #<issue> | next | review #<pr> | watch | land #<pr>"
-allowed-tools: Read, Glob, Grep, Bash(git:*), Bash(gh:*), Bash(pnpm:*), Bash(npm:*), Bash(npx:*), Bash(timeout:*), Bash(jq:*), Agent, SendMessage, mcp__claude-code-remote__get_session, mcp__claude-code-remote__set_session_title
+allowed-tools: Read, Glob, Grep, Bash(git:*), Bash(gh:*), Bash(pnpm:*), Bash(npm:*), Bash(npx:*), Bash(timeout:*), Bash(jq:*), Bash(*/delegating-github-issues/scripts/delegate-status:*), Agent, SendMessage, mcp__claude-code-remote__get_session, mcp__claude-code-remote__set_session_title
 ---
 
 Current branch:
@@ -17,7 +17,7 @@ Project delegation settings (`.claude/delegation.md`):
 
 If the settings above read `none`, reply "This project has no `.claude/delegation.md`, so `/delegate` is not set up here. Add one with a **Parameters** table for the `delegating-github-issues` skill and a **Project rules** list." and stop. Never guess a project's settings.
 
-Otherwise the settings file's **Parameters** table sets the skill's parameters; any parameter it leaves out takes the skill's default. The skill's defaults are `max_worktrees` 1, `max_open_prs` 6, `branch_prefix` `delegated/`, `claim_ttl` 4 hours, `progress_label` `in-progress`, and `walkthrough`, `oracle` and `land` off. `max_worktrees` is 1 because one session works one issue; parallelism comes from running several `/loop /delegate` sessions, each claiming its own issue, and a project that raises it pays in that session's context. Its **Project rules** apply inside every delegated run. Owner and repo come from the **Repository** line above: strip any `https://github.com/` or `git@github.com:` prefix and `.git` suffix. A value in the settings file wins over it.
+Otherwise the settings file's **Parameters** table sets the skill's parameters; any parameter it leaves out takes the skill's default. The skill's defaults are `max_worktrees` 1, `max_open_prs` 6, `branch_prefix` `delegated/`, `claim_ttl` 4 hours, `progress_label` `in-progress`, `tier_small_max_lines` 150, `tier_small_max_packages` 1, no `risk_paths`, `walkthrough_paths` the UI root without test files, and `local_full_suite`, `walkthrough`, `oracle` and `land` off. `max_worktrees` is 1 because one session works one issue; parallelism comes from running several `/loop /delegate` sessions, each claiming its own issue, and a project that raises it pays in that session's context. Its **Project rules** apply inside every delegated run. Owner and repo come from the **Repository** line above: strip any `https://github.com/` or `git@github.com:` prefix and `.git` suffix. A value in the settings file wins over it.
 
 ## Mode
 
@@ -31,13 +31,18 @@ Parse `$ARGUMENTS`:
 - `land #<n>` or `land <n>` → **Land** PR `n`.
 - Anything else → print the six forms above and stop.
 
+## Model
+
+The `/loop /delegate` session mostly routes: it runs `delegate-status`, reads verdict lines and dispatches subagents, and it writes no production code. It can run on a cheaper model than the work it hands out; choose one with `/model` before starting the loop. The implementer (Work step 6) and Land's review subagent (Land step 5) keep `model: opus` whatever the session runs on, and every other subagent runs at its own default. This is a recommendation for the human: the command pins no model, so a session that needs judgement it cannot give can be switched without editing anything.
+
 ## Procedure
 
-Load the `delegating-github-issues` skill and follow the named entry point with the parameters above.
+Load the `delegating-github-issues` skill and follow the named entry point with the parameters above, reading only the reference files its **Entry points** index names for that mode.
 
 These rules apply in every project, alongside its Project rules:
 
 - Wait for commit approval before every commit in **Work** or **Review** started by hand. **Run**, **Watch**, the **Work**, **Review** and **Land** runs they start, and `land #<n>` commit without asking.
+- **`delegate-status`** (skill): claims, reclaim, the budget count, Pick's eligibility and Watch's PR classification run through the skill's `scripts/delegate-status`, which prints one line of JSON; the delegator never re-derives them with its own `gh` and `jq` calls.
 - **Hand-back contract** (skill): every subagent writes its report to a file and returns at most ten lines; the delegator never reads a diff, screenshot, snapshot or log, never enters a worktree, and never runs `agent-browser`.
 - **Session title** (skill): the chat is named after the issue or PR the session holds (`#N <issue title>`, `Review PR #P …`, `Land PR #P …`), and `/delegate watching <owner>/<repo>` when a Run or Watch pass ends holding nothing, so the human can tell delegator sessions apart in the sidebar or the `/resume` picker. The rename never stops a run.
 - **Stop rule** (skill): a run stops, releases its claims and reports where it got to at 60 % context, 150 main-session tool calls, or the third identical isolation-guard refusal; the next `/loop` pass starts fresh.
