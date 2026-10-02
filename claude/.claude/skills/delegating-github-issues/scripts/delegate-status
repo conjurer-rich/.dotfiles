@@ -35,6 +35,7 @@
 #
 
 set -euo pipefail
+shopt -s inherit_errexit 2> /dev/null || true
 
 usage() {
   sed -n '10,27p' "$0" | sed 's/^# \{0,1\}//' >&2
@@ -161,16 +162,16 @@ remove_label() {
 
 ensure_label() {
   local found
-  found="$(gh_json label list --search "$PROGRESS_LABEL" --json name --limit 100 \
+  found="$(gh_json label list -R "$REPO" --search "$PROGRESS_LABEL" --json name --limit 100 \
     | jq -r --arg l "$PROGRESS_LABEL" '.[] | select(.name == $l) | .name')"
   if [ -z "$found" ]; then
-    gh label create "$PROGRESS_LABEL" --color FBCA04 --description 'A delegator session is working on this' \
+    gh label create -R "$REPO" "$PROGRESS_LABEL" --color FBCA04 --description 'A delegator session is working on this' \
       > /dev/null || die "creating label $PROGRESS_LABEL failed"
   fi
 }
 
 open_pr_for() {
-  gh_json pr list --state open --limit 100 --json number,headRefName \
+  gh_json pr list -R "$REPO" --state open --limit 100 --json number,headRefName \
     | jq --arg p "$PREFIX$1-" '[.[] | select(.headRefName | startswith($p)) | .number] | first // null'
 }
 
@@ -238,16 +239,26 @@ cmd_renew() {
 cmd_release() {
   need_session
   need_args 3
-  local n="${POSITIONAL[1]}" id="${POSITIONAL[2]}" body
+  local n="${POSITIONAL[1]}" id="${POSITIONAL[2]}" body comment winner
   if [ "$DELETE" -eq 0 ] && [ -z "$REASON" ]; then
     die "release takes --reason <text> or --delete" 2
   fi
-  body="$(gh_json api "repos/$REPO/issues/comments/$id" | jq -r '.body // ""')"
+  comment="$(gh_json api "repos/$REPO/issues/comments/$id")"
+  case "$(printf '%s' "$comment" | jq -r '.issue_url // ""')" in
+    */issues/"$n") ;;
+    *) die "comment $id is not on #$n; refusing to touch it" 3 ;;
+  esac
+  body="$(printf '%s' "$comment" | jq -r '.body // ""')"
   case "$body" in
     *"<!-- delegator claim: $SESSION -->"*|*"<!-- delegator claim-released: $SESSION -->"*) ;;
     *) die "comment $id is not a claim of session $SESSION; refusing to touch it" 3 ;;
   esac
-  remove_label "$n"
+  # A lapsed claim's session releasing after another session won the item
+  # leaves the winner's label alone.
+  winner="$(winner_of "$(comments_of "$n")")"
+  if [ "$winner" = null ] || [ "$(printf '%s' "$winner" | jq '.id')" = "$id" ]; then
+    remove_label "$n"
+  fi
   if [ "$DELETE" -eq 1 ]; then
     gh_json api -X DELETE "repos/$REPO/issues/comments/$id" > /dev/null
   else
@@ -286,7 +297,7 @@ worktrees_json() {
     [ -n "$entry" ] || continue
     path="$(printf '%s' "$entry" | jq -r .path)"
     branch="$(printf '%s' "$entry" | jq -r .branch)"
-    pr="$(gh_json pr list --head "$branch" --state all --limit 1 --json number,state,headRefOid | jq -c 'first // null')"
+    pr="$(gh_json pr list -R "$REPO" --head "$branch" --state all --limit 1 --json number,state,headRefOid | jq -c 'first // null')"
     state="$(printf '%s' "$pr" | jq -r '.state // "NONE"')"
     head="$(printf '%s' "$pr" | jq -r '.headRefOid // ""')"
     reason=""
@@ -321,7 +332,7 @@ issue_from_comments() {
   local issue="$1" comments="$2" login="$3" winner derived reactions confirmed=false
   winner="$(winner_of "$comments")"
   derived="$(printf '%s' "$comments" | jq '[.[] | select(.body // "" | startswith("**Acceptance criteria (derived by the delegator"))] | last | .id // null')"
-  if [ "$winner" = null ] && [ "$derived" != null ] \
+  if [ "$derived" != null ] \
     && ! printf '%s' "$issue" | jq -e '.body // "" | gsub("\r"; "")
       | test("(^|\n) {0,3}#{1,6}[^\n]*acceptance criteria[^\n]*\n(\\s*\n)*\\s*([-*+]|[0-9]+[.)])\\s"; "i")' > /dev/null; then
     reactions="$(gh_json api --paginate "repos/$REPO/issues/comments/$derived/reactions" | jq -s 'add // []')"
@@ -336,13 +347,14 @@ issue_from_comments() {
        else ($c[$q + 1:] | any(.[]; human_reply)) | not end) as $question_open
     | { number: $i.number, title: $i.title,
         stale_label: ($w == null and any($i.labels[]; .name == $pl)) }
-    + if $w != null and $w.session != $s then {state: "claimed", holder: $w.session}
-      elif $w != null then {state: "held"}
-      elif $in_body then {state: "free", criteria: "body"}
-      elif $derived != null and $confirmed then {state: "free", criteria: "confirmed"}
-      elif $derived != null then {state: "waiting-on-human", reason: "criteria-unconfirmed"}
-      elif $question_open then {state: "waiting-on-human", reason: "question-unanswered"}
-      else {state: "free", criteria: "none"} end'
+    | (if $in_body then {state: "free", criteria: "body"}
+       elif $derived != null and $confirmed then {state: "free", criteria: "confirmed"}
+       elif $derived != null then {state: "waiting-on-human", reason: "criteria-unconfirmed"}
+       elif $question_open then {state: "waiting-on-human", reason: "question-unanswered"}
+       else {state: "free", criteria: "none"} end) as $criteria
+    | . + if $w != null and $w.session != $s then {state: "claimed", holder: $w.session}
+          elif $w != null then $criteria + {state: "held"}
+          else $criteria end'
 }
 
 # Classify one delegated PR (a `gh pr list` / `gh pr view` object): its
@@ -352,7 +364,7 @@ pr_json() {
   local pr="$1" number comments graphql result
   number="$(printf '%s' "$pr" | jq '.number')"
   comments="$(comments_of "$number")"
-  graphql="$(gh_json api graphql -F owner="${REPO%%/*}" -F repo="${REPO#*/}" -F pr="$number" -f query='
+  graphql="$(gh_json api graphql -f owner="${REPO%%/*}" -f repo="${REPO#*/}" -F pr="$number" -f query='
 query($owner:String!,$repo:String!,$pr:Int!){ repository(owner:$owner,name:$repo){ pullRequest(number:$pr){
   isDraft headRefOid
   reviewThreads(first:100){ nodes{ id isResolved path line comments(last:1){ nodes{ databaseId body author{ login __typename } } } } }
@@ -406,14 +418,14 @@ budget_json() {
 cmd_budget() {
   local worktrees prs
   worktrees="$(worktrees_json)"
-  prs="$(gh_json pr list --state open --limit 100 --json number)"
+  prs="$(gh_json pr list -R "$REPO" --state open --limit 100 --json number)"
   jq -nc --argjson w "$worktrees" --argjson b "$(budget_json "$worktrees" "$prs")" '{worktrees: $w, budget: $b}'
 }
 
 cmd_issue() {
   need_args 2
   local issue pr
-  issue="$(gh_json issue view "${POSITIONAL[1]}" --json number,title,labels,createdAt,updatedAt,body,state)"
+  issue="$(gh_json issue view "${POSITIONAL[1]}" -R "$REPO" --json number,title,labels,createdAt,updatedAt,body,state)"
   if ! printf '%s' "$issue" | jq -e --arg l "$LABEL" '.state == "OPEN" and any(.labels[]; .name == $l)' > /dev/null; then
     printf '%s' "$issue" | jq -c '{number, title, eligible: false, state: "not-eligible"}'
     return
@@ -430,7 +442,7 @@ cmd_issue() {
 cmd_pr() {
   need_args 2
   local pr
-  pr="$(gh_json pr view "${POSITIONAL[1]}" --json number,title,isDraft,headRefName,headRefOid,createdAt,labels)"
+  pr="$(gh_json pr view "${POSITIONAL[1]}" -R "$REPO" --json number,title,isDraft,headRefName,headRefOid,createdAt,labels)"
   pr_json "$pr" | jq -c '.'
 }
 
@@ -438,8 +450,8 @@ cmd_status() {
   local worktrees prs issues login cache="[]" new_cache="[]" results="[]" pr_results="[]"
   local issue number cached result pr comments budget
   worktrees="$(worktrees_json)"
-  prs="$(gh_json pr list --state open --limit 100 --json number,title,isDraft,headRefName,headRefOid,createdAt,labels)"
-  issues="$(gh_json issue list --label "$LABEL" --state open --limit 100 --json number,title,labels,createdAt,updatedAt,body \
+  prs="$(gh_json pr list -R "$REPO" --state open --limit 100 --json number,title,isDraft,headRefName,headRefOid,createdAt,labels)"
+  issues="$(gh_json issue list -R "$REPO" --label "$LABEL" --state open --limit 100 --json number,title,labels,createdAt,updatedAt,body \
     | jq -c --arg r "$RANK_LABELS" '
       ($r | split(",") | map(select(length > 0))) as $ranks
       | sort_by(([.labels[].name] as $names | ($ranks | index(first($ranks[] | select(. as $x | $names | index($x)))) // ($ranks | length))), .createdAt)')"
@@ -472,7 +484,7 @@ cmd_status() {
         result="$(issue_from_comments "$issue" "$comments" "$login")"
         new_cache="$(jq -c --argjson i "$issue" --argjson r "$result" --arg at "$NOW_ISO" '
           if $r.state == "claimed" then . + [{number: $i.number, reason: "claimed", holder: $r.holder, updatedAt: $i.updatedAt, checkedAt: $at}]
-          elif $r.state == "waiting-on-human" then . + [{number: $i.number, reason: "waiting-on-human", detail: $r.reason, updatedAt: $i.updatedAt, checkedAt: $at}]
+          elif $r.state == "waiting-on-human" and $r.reason != "criteria-unconfirmed" then . + [{number: $i.number, reason: "waiting-on-human", detail: $r.reason, updatedAt: $i.updatedAt, checkedAt: $at}]
           else . end' <<< "$new_cache")"
       fi
     fi

@@ -125,7 +125,7 @@ check_not_called "-X POST repos/acme/widgets/issues/9/comments" "no second claim
 use claims
 echo '[]' > "$FAKE_STATE/labels.json"
 run claim 8 > /dev/null
-check_called "label create in-progress" "a missing progress label is created"
+check_called "label create -R acme/widgets in-progress" "a missing progress label is created"
 check_not_called "--force" "the label is never created with --force"
 
 # An open delegated PR for the issue is reported on a won claim.
@@ -182,6 +182,20 @@ else
 fi
 check_not_called "-X DELETE repos/acme/widgets/issues/comments/500" "another session's claim is never deleted"
 check_not_called "-X DELETE repos/acme/widgets/issues/11/labels" "another session's label is never removed"
+
+# Release touches only the item it names, and leaves the label to a session
+# that has since won the item.
+use claims
+if run release 11 300 --delete > /dev/null 2>&1; then
+  fail "release refuses a claim comment that belongs to another item"
+else
+  pass "release refuses a claim comment that belongs to another item"
+fi
+check_not_called "-X DELETE repos/acme/widgets/issues/comments/300" "a claim on another item is never deleted"
+use claims
+out="$(run release 10 400 --reason 'lapsed' || true)"
+check "releasing a lapsed claim reports released" "$out" '.result == "released"'
+check_not_called "-X DELETE repos/acme/widgets/issues/10/labels" "releasing a lapsed claim leaves the new holder's label"
 
 # ---------------------------------------------------------------- clear-label
 
@@ -281,6 +295,22 @@ check "a closed issue is not eligible" "$out" '.eligible == false and .state == 
 out="$(run issue 51 || true)"
 check "an issue without the label is not eligible" "$out" '.eligible == false and .state == "not-eligible"'
 
+# Every gh call that is not `gh api` names the repository, so a checkout of
+# a fork never reads the fork's issues and PRs while claiming upstream.
+use status
+run status --land on > /dev/null
+if grep -E '^(issue|pr|label) ' "$FAKE_STATE/calls.log" | grep -vq -- '-R acme/widgets'; then
+  fail "every gh issue, pr and label call names the repository"
+else
+  pass "every gh issue, pr and label call names the repository"
+fi
+check_called "-f owner=acme -f repo=widgets" "graphql sends owner and repo as strings"
+
+# A held issue still says how its criteria stand.
+use status
+out="$(run status --land on || true)"
+check "a held issue reports its criteria" "$out" "$(issue 38) | .state == \"held\" and .criteria == \"none\""
+
 # ---------------------------------------------------------------- one PR
 
 # Review and Land read one PR: its class, and the bodies of what needs an
@@ -301,20 +331,23 @@ check "pr reports Ready, the head and the verified land marker" "$out" \
 use status
 CACHE="$FAKE_STATE/pick-cache.json"
 run status --cache "$CACHE" > /dev/null
-check "the cache records each skipped issue with its reason" "$(cat "$CACHE")" \
-  '[.[] | [.number, .reason]] | sort == [[32, "waiting-on-human"], [35, "waiting-on-human"], [36, "claimed"]]'
+check "the cache records each skipped issue with its reason, but not unconfirmed criteria" "$(cat "$CACHE")" \
+  '[.[] | [.number, .reason]] | sort == [[35, "waiting-on-human"], [36, "claimed"]]'
 
 : > "$FAKE_STATE/calls.log"
 out="$(run status --cache "$CACHE")"
-check_not_called "issues/32/comments" "an unchanged waiting issue is not re-read"
+check_called "issues/32/comments" "unconfirmed criteria are re-read every pass: a thumbs-up does not bump updatedAt"
+check_not_called "issues/35/comments" "an unchanged unanswered question is not re-read"
 check_not_called "issues/36/comments" "a recently claimed issue is not re-read"
-check "a cached skip keeps its state" "$out" "$(issue 32) | .state == \"waiting-on-human\" and .cached == true"
+check "a cached skip keeps its state" "$out" "$(issue 35) | .state == \"waiting-on-human\" and .cached == true"
 
 jq 'map(if .number == 32 then .updatedAt = "2026-10-02T11:59:00Z" else . end)' \
   "$FAKE_STATE/issues.json" > "$FAKE_STATE/issues.tmp" && mv "$FAKE_STATE/issues.tmp" "$FAKE_STATE/issues.json"
+jq 'map(if .number == 35 then .updatedAt = "2026-10-02T11:59:00Z" else . end)' \
+  "$FAKE_STATE/issues.json" > "$FAKE_STATE/issues.tmp" && mv "$FAKE_STATE/issues.tmp" "$FAKE_STATE/issues.json"
 : > "$FAKE_STATE/calls.log"
 run status --cache "$CACHE" > /dev/null
-check_called "issues/32/comments" "an issue updated since it was cached is re-read"
+check_called "issues/35/comments" "an issue updated since it was cached is re-read"
 
 : > "$FAKE_STATE/calls.log"
 RUN_NOW=$((NOW + 14401)) run status --cache "$CACHE" > /dev/null

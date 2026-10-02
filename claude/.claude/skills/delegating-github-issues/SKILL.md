@@ -48,7 +48,7 @@ Several delegator sessions can run at once through one `gh` login, so a session 
 
 - **Claim.** `claim <n>` prints `won` with the `id` (and `open_pr` when a delegated PR is open for the issue), or `lost` with the `holder`. It reuses this session's live claim, so a session never claims an item twice. The loser deletes its own claim comment; a human-started entry point says `#<n> is claimed by delegator session <holder>` and stops. The winner adds the label, creating it if missing; Never `--force`.
 - **Confirm.** `confirm <n> <id>` prints `live` or `lost`. Confirm before any push, PR creation or merge. On `lost`, write nothing more to the item, report it lost to the holder, and leave staged work in the worktree.
-- **Renew.** `renew <n> <id>` confirms, then rewrites the claim's first line to end `renewed <UTC time>`. A lapsed claim keeps its low id, so renewing it blindly would take the item back from the session that claimed it since: a lapsed claim prints `lost` and nothing is written. Renew only right before a long step, Work steps 6, 8 and 9, Review step 5, Land steps 5 and 7, so each starts with a whole `claim_ttl`. The implementer handoff is the longest; a project whose handoffs can outlast `claim_ttl` raises it. A lapse is still caught by the next Confirm.
+- **Renew.** `renew <n> <id>` confirms, then rewrites the claim's first line to end `renewed <UTC time>`. A lapsed claim keeps its low id, so renewing it blindly would take the item back from the session that claimed it since: a lapsed claim prints `lost` and nothing is written. Renew only right before a long step, Work steps 6, 7, 8 and 9, Review step 5, Land steps 5 and 7, so each starts with a whole `claim_ttl`. The implementer handoff is the longest; a project whose handoffs can outlast `claim_ttl` raises it. A lapse is still caught by the next Confirm.
 - **Release.** Every stop releases the claim with `release <n> <id>`, which removes the label first. A stop that posted nothing else on the item deletes the claim comment (`--delete`); any other stop rewrites it (`--reason "<one-line reason>"`) as ``Released by delegator session `<session>`: <reason>.`` and `<!-- delegator claim-released: <session> -->`. It refuses a comment that is not this session's.
 
 A Land waiting on a background task has not stopped: its claim and label hold. Review steps inside Land use Land's claim. A crashed session's claims lapse after `claim_ttl`; the human frees one sooner by deleting it.
@@ -69,10 +69,10 @@ Read only the reference files for the entry point you are running. Paths are rel
 |---|---|
 | **Pick** | `references/pick.md` |
 | **Work** `#N` | `references/work.md` |
-| **Review** `#PR` | `references/review.md`, and `references/work.md` for its steps 6–9 |
-| **Watch** | `references/watch.md`, then the files for any Review or Land it runs |
-| **Run** | `references/run.md`, `references/watch.md` and `references/pick.md`, then `references/work.md` when Pick returns an issue |
-| **Land** `#PR` | `references/land.md`, and `references/review.md` when its step 3 has review to answer |
+| **Review** `#PR` | `references/review.md` and `references/work.md` (its steps 5–10: bootstrap, handoff, checks, walkthrough, repair round, ship) |
+| **Watch** | `references/watch.md` and `references/work.md` (its step 2's Reclaim), then the files for any Review or Land it runs |
+| **Run** | `references/run.md`, `references/watch.md`, `references/pick.md` and `references/work.md` |
+| **Land** `#PR` | `references/land.md`, `references/review.md` (its step 2, and steps 4–6 when step 3 has review to answer) and `references/work.md` (its steps 2, 5, 6 and 10) |
 | **Blocked**, **Preview oracle rule** | `references/blocked-and-oracle.md`, when Work or Review sends you there or `oracle` is on |
 | **Hand-back contract** | `references/hand-back.md`, before dispatching any subagent |
 | **Session title**, **Running in a cloud container** | `references/session.md`, when the title changes |

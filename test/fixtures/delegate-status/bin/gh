@@ -87,7 +87,8 @@ case "${args[0]:-}" in
         id="${path##*/}"
         f="$(comments_file_holding "$id")"
         if [ -z "$f" ]; then echo "gh: Not Found (HTTP 404)" >&2; exit 1; fi
-        jq --argjson id "$id" '.[] | select(.id == $id)' "$f"; exit 0 ;;
+        n="$(basename "$f" .json)"; n="${n#comments-}"
+        jq --argjson id "$id" --arg n "$n" '.[] | select(.id == $id) | .issue_url = "https://api.github.com/repos/acme/widgets/issues/\($n)"' "$f"; exit 0 ;;
       GET\ repos/*/issues/*/comments)
         n="${path%/comments}"; n="${n##*/}"
         serve "comments-$n.json"; exit 0 ;;
