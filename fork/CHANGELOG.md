@@ -1,5 +1,17 @@
 # Changelog
 
+## 4.27.0
+
+### Minor Changes
+
+- 5d83e3e: `/delegate` works in Claude Code on the web, where GitHub GraphQL is blocked. `delegate-status` now reads and writes GitHub through `gh api` REST endpoints only (paginated), plus the session proxy's `/ccr/` routes for review-thread resolution and returning a PR to draft; where those routes are absent (the plain CLI talking to github.com) the same two calls fall back to GraphQL, so the CLI path is unchanged. Ready detection reads the issue timeline's `ready_for_review` and `committed` events, and a bot is a REST `user.type` of `Bot`. Its output for the existing subcommands is unchanged. New subcommands carry the writes the references used to make with GraphQL-backed `gh` commands: `comment`, `reply`, `pr-create`, `pr-edit`, `to-draft`, `merge` (squash, pinned to the verified head SHA), `checks` (a bounded REST poll of check runs and commit statuses in place of `gh pr checks --watch`) and `merged-sizes`. The references, the `Never` list and the command call them instead of `gh pr`, `gh issue`, `gh label` and the thread-reply mutation.
+
+### Patch Changes
+
+- 5d83e3e: `delegating-github-issues`: in Claude Code on the web, the session id that `set_session_title` needs is fetched with `get_session` once per session instead of once per run. It is kept in `ccr-session-id` in the session's scratch directory, so every later `/loop /delegate` pass reuses it.
+- 5d83e3e: `delegating-github-issues`: in Claude Code on the web, where the `subscribe_pr_activity` tool of the `claude-code-remote` MCP server is available, Watch subscribes each delegated PR once (Work subscribes the PR it opens) and leaves no background poll: a comment, a Ready click or a CI result wakes the session for one Watch pass. Elsewhere, the minute-by-minute background poll stays, over REST. `/delegate` pre-approves the subscribe and unsubscribe tools.
+- 5d83e3e: `delegating-github-issues`: a Run pass reads `references/work.md` only once Pick returns a candidate, instead of on every pass, so a `/loop /delegate` pass that finds nothing to do, or is over budget, no longer loads Work's steps. Reclaim, which every Watch pass needs, moves out of Work step 2 into its own `references/reclaim.md`, which Work, Watch and Land point to. The Reclaim rules themselves are unchanged.
+
 ## 4.26.0
 
 ### Minor Changes
