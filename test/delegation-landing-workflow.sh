@@ -400,7 +400,11 @@ reject_regex 'Work\*\* step 2'"'"'s Reclaim' "nothing sends a pass to work.md fo
 # get_session ran once per /loop pass; the id is the session's, not the run's.
 require_text 'Call `get_session` once per session, not once per run' "the cloud session id is fetched once per session"
 require_text 'write the id to `ccr-session-id` in the session'"'"'s scratch directory' "the cloud session id survives /loop passes"
+# On the web, PR events wake the session instead of a minute-by-minute poll.
+require_text 'subscribe each delegated PR once' "Watch subscribes delegated PRs where the tool exists"
+require_text 'Otherwise leave a background poll running between passes' "the CLI keeps the background poll"
 require_text 'with `gh api` REST calls only' "the poll runs over REST"
+require_text 'Subscribe the PR as **Watch** step 6 says.' "Work subscribes the PR it opens"
 
 # Progressive disclosure. Every mode loaded the whole 35-50 KB skill, a quiet
 # Watch pass included. The core keeps what every mode needs; each entry point
