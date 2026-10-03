@@ -387,6 +387,16 @@ require_text 'delegate-status comment N --body-file <file>' "issue comments go o
 require_text '1. `delegate-status to-draft <PR>`.' "Bail-out returns the PR to draft over REST"
 require_text 'is briefed with `delegate-status`'"'"'s absolute path and `--repo`' "subagents that write to GitHub can reach the script"
 
+# Efficiency. A Run pass read work.md (the largest reference) even when Watch
+# found nothing and the budget was at its limit; Reclaim, which every pass
+# needs, now lives on its own.
+if grep -Fq '| **Run** | `references/run.md`, `references/watch.md`, `references/reclaim.md` and `references/pick.md`; `references/work.md` once Pick finds one |' "$CORE"; then
+  pass "a Run pass reads work.md only once Pick finds a candidate"
+else
+  fail "a Run pass reads work.md only once Pick finds a candidate"
+fi
+require_text 'Only when Pick returns a candidate, read `references/work.md`' "run.md defers work.md"
+reject_regex 'Work\*\* step 2'"'"'s Reclaim' "nothing sends a pass to work.md for Reclaim"
 require_text 'with `gh api` REST calls only' "the poll runs over REST"
 
 # Progressive disclosure. Every mode loaded the whole 35-50 KB skill, a quiet
@@ -411,7 +421,7 @@ if [ -x "$SKILL_DIR/scripts/delegate-status" ]; then
 else
   fail "the bookkeeping script ships executable"
 fi
-for ref in pick work review watch run land blocked-and-oracle hand-back session; do
+for ref in pick work review watch run land blocked-and-oracle hand-back session reclaim; do
   if [ -f "$SKILL_DIR/references/$ref.md" ] && grep -Fq -- "\`references/$ref.md\`" "$CORE"; then
     pass "references/$ref.md exists and the core's index names it"
   else

@@ -2,7 +2,7 @@
 
 One pass over every open delegated PR, built to run under `/loop`. Watch holds no state between passes beyond its session name; everything it needs is on GitHub, so a restarted loop loses nothing but waits out its old claims.
 
-1. **Status.** Run `delegate-status status` (under **Run**, with Pick's `--cache`). Reclaim each `worktrees.reclaim` entry as **Work** step 2 does.
+1. **Status.** Run `delegate-status status` (under **Run**, with Pick's `--cache`). Reclaim each `worktrees.reclaim` entry as `references/reclaim.md` says.
 2. Its `prs` lists every open PR whose head branch starts with `<branch_prefix>`, oldest `createdAt` first.
 3. Each PR carries a `class`:
    - **Claimed** (`claimed`): another session holds a live claim on it (`holder`). Not touched this pass. A PR marked `stale_label` carries `<progress_label>`, and one with no live claim is not Claimed: remove the label as **Stale label** says; its class already ignores the label.
