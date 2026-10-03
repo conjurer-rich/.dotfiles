@@ -397,6 +397,9 @@ else
 fi
 require_text 'Only when Pick returns a candidate, read `references/work.md`' "run.md defers work.md"
 reject_regex 'Work\*\* step 2'"'"'s Reclaim' "nothing sends a pass to work.md for Reclaim"
+# get_session ran once per /loop pass; the id is the session's, not the run's.
+require_text 'Call `get_session` once per session, not once per run' "the cloud session id is fetched once per session"
+require_text 'write the id to `ccr-session-id` in the session'"'"'s scratch directory' "the cloud session id survives /loop passes"
 require_text 'with `gh api` REST calls only' "the poll runs over REST"
 
 # Progressive disclosure. Every mode loaded the whole 35-50 KB skill, a quiet
