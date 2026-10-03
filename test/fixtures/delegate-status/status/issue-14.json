@@ -1,6 +1,7 @@
 {
   "number": 14,
   "title": "Issue 14",
+  "state": "open",
   "labels": [
     {
       "name": "agent-ready"
@@ -9,8 +10,7 @@
       "name": "p1"
     }
   ],
-  "createdAt": "2026-09-01T09:00:00Z",
-  "updatedAt": "2026-09-01T09:00:00Z",
-  "body": "Something is broken.",
-  "state": "OPEN"
+  "created_at": "2026-09-01T09:00:00Z",
+  "updated_at": "2026-09-01T09:00:00Z",
+  "body": "Something is broken."
 }

@@ -2,6 +2,7 @@
   {
     "number": 31,
     "title": "Issue 31",
+    "state": "open",
     "labels": [
       {
         "name": "agent-ready"
@@ -10,13 +11,14 @@
         "name": "p1"
       }
     ],
-    "createdAt": "2026-09-10T09:00:00Z",
-    "updatedAt": "2026-09-10T09:00:00Z",
+    "created_at": "2026-09-10T09:00:00Z",
+    "updated_at": "2026-09-10T09:00:00Z",
     "body": "Fix the thing.\r\n\r\n## Acceptance criteria\r\n\r\n1. The thing works\r\n2. It stays working\r\n"
   },
   {
     "number": 32,
     "title": "Issue 32",
+    "state": "open",
     "labels": [
       {
         "name": "agent-ready"
@@ -25,13 +27,14 @@
         "name": "p1"
       }
     ],
-    "createdAt": "2026-09-05T09:00:00Z",
-    "updatedAt": "2026-09-05T09:00:00Z",
+    "created_at": "2026-09-05T09:00:00Z",
+    "updated_at": "2026-09-05T09:00:00Z",
     "body": "Make import faster.\n\n### Acceptance criteria\n\nTBD with the team.\n"
   },
   {
     "number": 33,
     "title": "Issue 33",
+    "state": "open",
     "labels": [
       {
         "name": "agent-ready"
@@ -40,37 +43,40 @@
         "name": "p2"
       }
     ],
-    "createdAt": "2026-09-01T09:00:00Z",
-    "updatedAt": "2026-09-29T09:00:00Z",
+    "created_at": "2026-09-01T09:00:00Z",
+    "updated_at": "2026-09-29T09:00:00Z",
     "body": "Something is broken."
   },
   {
     "number": 34,
     "title": "Issue 34",
+    "state": "open",
     "labels": [
       {
         "name": "agent-ready"
       }
     ],
-    "createdAt": "2026-08-01T09:00:00Z",
-    "updatedAt": "2026-08-01T09:00:00Z",
+    "created_at": "2026-08-01T09:00:00Z",
+    "updated_at": "2026-08-01T09:00:00Z",
     "body": "Something is broken."
   },
   {
     "number": 35,
     "title": "Issue 35",
+    "state": "open",
     "labels": [
       {
         "name": "agent-ready"
       }
     ],
-    "createdAt": "2026-08-15T09:00:00Z",
-    "updatedAt": "2026-08-15T09:00:00Z",
+    "created_at": "2026-08-15T09:00:00Z",
+    "updated_at": "2026-08-15T09:00:00Z",
     "body": "Something is broken."
   },
   {
     "number": 36,
     "title": "Issue 36",
+    "state": "open",
     "labels": [
       {
         "name": "agent-ready"
@@ -79,13 +85,14 @@
         "name": "p2"
       }
     ],
-    "createdAt": "2026-09-02T09:00:00Z",
-    "updatedAt": "2026-09-02T09:00:00Z",
+    "created_at": "2026-09-02T09:00:00Z",
+    "updated_at": "2026-09-02T09:00:00Z",
     "body": "Something is broken."
   },
   {
     "number": 37,
     "title": "Issue 37",
+    "state": "open",
     "labels": [
       {
         "name": "agent-ready"
@@ -97,13 +104,14 @@
         "name": "in-progress"
       }
     ],
-    "createdAt": "2026-09-03T09:00:00Z",
-    "updatedAt": "2026-09-03T09:00:00Z",
+    "created_at": "2026-09-03T09:00:00Z",
+    "updated_at": "2026-09-03T09:00:00Z",
     "body": "Something is broken."
   },
   {
     "number": 38,
     "title": "Issue 38",
+    "state": "open",
     "labels": [
       {
         "name": "agent-ready"
@@ -112,13 +120,14 @@
         "name": "p1"
       }
     ],
-    "createdAt": "2026-09-11T09:00:00Z",
-    "updatedAt": "2026-09-11T09:00:00Z",
+    "created_at": "2026-09-11T09:00:00Z",
+    "updated_at": "2026-09-11T09:00:00Z",
     "body": "Something is broken."
   },
   {
     "number": 14,
     "title": "Issue 14",
+    "state": "open",
     "labels": [
       {
         "name": "agent-ready"
@@ -127,8 +136,8 @@
         "name": "p1"
       }
     ],
-    "createdAt": "2026-09-01T09:00:00Z",
-    "updatedAt": "2026-09-01T09:00:00Z",
+    "created_at": "2026-09-01T09:00:00Z",
+    "updated_at": "2026-09-01T09:00:00Z",
     "body": "Something is broken."
   }
 ]

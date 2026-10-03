@@ -1,9 +1,14 @@
 #!/usr/bin/env bash
 #
 # Test the delegating-github-issues bookkeeping script against recorded gh
-# JSON. A fake gh and git (test/fixtures/delegate-status/bin) serve the
+# REST JSON. A fake gh and git (test/fixtures/delegate-status/bin) serve the
 # fixtures, apply writes to the recorded comments, and log every call, so a
 # test can check both what the script printed and what it wrote to GitHub.
+#
+# Claude Code on the web blocks GitHub GraphQL, so the script reaches GitHub
+# through `gh api` REST calls only, plus the session proxy's /ccr/ routes for
+# review threads and draft state; these tests pin that, and the GraphQL
+# fallback the CLI takes when a /ccr/ route answers 404.
 #
 # Covers the races the Claims protocol exists for (two claims at once, a
 # lapsed claim with the lower id, renewing a lapsed claim, a stale progress
@@ -125,7 +130,7 @@ check_not_called "-X POST repos/acme/widgets/issues/9/comments" "no second claim
 use claims
 echo '[]' > "$FAKE_STATE/labels.json"
 run claim 8 > /dev/null
-check_called "label create -R acme/widgets in-progress" "a missing progress label is created"
+check_called "api -X POST repos/acme/widgets/labels -f name=in-progress" "a missing progress label is created"
 check_not_called "--force" "the label is never created with --force"
 
 # An open delegated PR for the issue is reported on a won claim.
@@ -247,7 +252,7 @@ check "a claimed issue's label is not stale" "$out" "$(issue 36) | .stale_label 
 pr() { printf '.prs[] | select(.number == %s)' "$1"; }
 check "only delegated PRs are classified" "$out" '[.prs[].number] == [20, 21, 22, 23, 24]'
 check "an unresolved thread whose last comment is the human's needs an answer" "$out" \
-  "$(pr 20) | .needs_answer.threads == [{\"id\": \"T1\", \"comment\": 601}]"
+  "$(pr 20) | .needs_answer.threads == [{\"id\": 600, \"comment\": 601}]"
 check "marker, footer, bot, preview and reply-to comments need no answer" "$out" \
   "$(pr 20) | .needs_answer.comments == [505]"
 check "an unanswered review body needs an answer; an answered or bot one does not" "$out" \
@@ -295,16 +300,49 @@ check "a closed issue is not eligible" "$out" '.eligible == false and .state == 
 out="$(run issue 51 || true)"
 check "an issue without the label is not eligible" "$out" '.eligible == false and .state == "not-eligible"'
 
-# Every gh call that is not `gh api` names the repository, so a checkout of
-# a fork never reads the fork's issues and PRs while claiming upstream.
+# Claude Code on the web answers every GraphQL request with 403, and `gh pr`,
+# `gh issue` and `gh label` are GraphQL underneath, so the first status call
+# of 4.26.0 failed there and nothing was ever delegated. Every call is `gh
+# api` against this repository's REST endpoints.
 use status
 run status --land on > /dev/null
-if grep -E '^(issue|pr|label) ' "$FAKE_STATE/calls.log" | grep -vq -- '-R acme/widgets'; then
-  fail "every gh issue, pr and label call names the repository"
+run pr 20 --land on > /dev/null
+run issue 31 > /dev/null
+run budget > /dev/null
+if grep -v '^git ' "$FAKE_STATE/calls.log" | grep -Ev '^api (--paginate |-X [A-Z]+ )?(repos/acme/widgets/|user$)'; then
+  fail "status, pr, issue and budget call only gh api REST endpoints of the repository"
 else
-  pass "every gh issue, pr and label call names the repository"
+  pass "status, pr, issue and budget call only gh api REST endpoints of the repository"
 fi
-check_called "-f owner=acme -f repo=widgets" "graphql sends owner and repo as strings"
+check_not_called "graphql" "no GraphQL request is made while the /ccr/ routes answer"
+check_called "api --paginate repos/acme/widgets/pulls/20/ccr/review_threads" "review threads come from the /ccr/ route"
+check_called "api --paginate repos/acme/widgets/issues/20/timeline?per_page=100" "Ready comes from the issue timeline"
+check_called "repos/acme/widgets/pulls?state=all&per_page=1&head=acme%3Adelegated%2F2-merged" "a worktree's PR is found by owner:branch"
+check_called "repos/acme/widgets/issues?state=open&per_page=100&labels=agent-ready" "eligible issues are listed by label"
+
+# A pull request is an issue to the REST API; it is never an eligible issue.
+use status
+jq '. + {pull_request: {}}' "$FAKE_STATE/issue-31.json" > "$FAKE_STATE/issue-31.tmp" && mv "$FAKE_STATE/issue-31.tmp" "$FAKE_STATE/issue-31.json"
+check "issue refuses a pull request" "$(run issue 31 || true)" '.eligible == false'
+jq '. + [{number: 60, title: "A PR", state: "open", labels: [{name: "agent-ready"}], created_at: "2026-09-01T09:00:00Z", updated_at: "2026-09-01T09:00:00Z", body: "", pull_request: {}}]' \
+  "$FAKE_STATE/issues.json" > "$FAKE_STATE/issues.tmp" && mv "$FAKE_STATE/issues.tmp" "$FAKE_STATE/issues.json"
+check "status lists no pull request as an issue" "$(run status || true)" 'all(.issues[]; .number != 60)'
+
+# On the CLI, github.com has no /ccr/ routes: threads fall back to GraphQL and
+# classify exactly as they do through the proxy.
+use status
+ccr_out="$(run pr 20 --land on || true)"
+touch "$FAKE_STATE/ccr-404"
+gql_out="$(run pr 20 --land on || true)"
+check "a 404 from /ccr/review_threads falls back to GraphQL with the same result" "$(jq -n --argjson a "$ccr_out" --argjson b "$gql_out" '[$a, $b]')" \
+  '.[0] == .[1] and .[0].needs_answer.threads == [{"id": 600, "comment": 601}]'
+check_called "-f owner=acme -f repo=widgets" "the GraphQL fallback sends owner and repo as strings"
+
+# A commit after the human's Ready leaves the PR Ready but tells Land so.
+use status
+printf '%s' '[{"event":"committed"},{"event":"ready_for_review"},{"event":"committed"}]' > "$FAKE_STATE/timeline-21.json"
+out="$(run pr 21 --land on || true)"
+check "a commit after the last ready event is reported as latest" "$out" '.class == "ready" and .ready == 1 and .latest == "PullRequestCommit"'
 
 # A held issue still says how its criteria stand.
 use status
@@ -321,10 +359,88 @@ check "pr reports the same class as status" "$out" '.number == 20 and .class == 
 check "pr lists each comment needing an answer with its body" "$out" \
   '[.items[] | [.kind, .id]] == [["thread", 601], ["comment", 505], ["review", 701]]'
 check "a thread item carries its thread id, path and line" "$out" \
-  '.items[0] == {"kind": "thread", "id": 601, "thread": "T1", "path": "src/import.ts", "line": 42, "login": "rich", "body": "Rename this please"}'
+  '.items[0] == {"kind": "thread", "id": 601, "thread": 600, "path": "src/import.ts", "line": 42, "login": "rich", "body": "Rename this please"}'
 out="$(run pr 21 --land on || true)"
 check "pr reports Ready, the head and the verified land marker" "$out" \
   '.class == "ready" and .head == "h21" and .isDraft == false and .land_marker.verified and .items == []'
+
+# ---------------------------------------------------------------- writes
+
+# The references' writes go through the script, never through GraphQL-backed
+# gh commands. Each takes its text from a file, verbatim.
+use claims
+BODY="$FAKE_STATE/body.md"
+printf '%s\n' 'Opened `#40` for this issue.' '@not-a-file' '<!-- delegator -->' > "$BODY"
+out="$(run comment 12 --body-file "$BODY" || true)"
+check "comment posts the file and reports the new comment" "$out" '.item == 12 and .result == "commented" and .id == 900 and (.url | endswith("#issuecomment-900"))'
+check "the comment body is the file's text, a leading @ included" "$(jq '.[] | select(.id == 900)' "$FAKE_STATE/comments-12.json")" \
+  '.body == "Opened `#40` for this issue.\n@not-a-file\n<!-- delegator -->"'
+if run comment 12 > /dev/null 2>&1; then fail "comment without --body-file is a usage error"; else pass "comment without --body-file is a usage error"; fi
+
+use status
+BODY="$FAKE_STATE/body.md"
+echo 'Renamed in abc123. <!-- delegator -->' > "$BODY"
+out="$(run reply 20 600 --body-file "$BODY" || true)"
+check "reply answers a thread by its first comment" "$out" '.result == "replied" and .id == 950'
+check_called "-X POST repos/acme/widgets/pulls/20/comments/600/replies -F body=@$BODY" "reply posts to the thread's replies endpoint"
+
+out="$(run pr-create --head delegated/12-fix-thing --title 'fix(web): thing (#12)' --body-file "$BODY" --draft || true)"
+check "pr-create opens the PR and reports its number, URL and head" "$out" '.item == 99 and .result == "created" and .isDraft and .head == "h99"'
+check_called "-f head=delegated/12-fix-thing -f base=main -f title=fix(web): thing (#12) -F body=@$BODY -F draft=true" "pr-create targets the default branch as a draft"
+out="$(run pr-create --head delegated/12-fix-thing --title t --body-file "$BODY" --base release || true)"
+check "pr-create opens a ready PR without --draft" "$out" '.isDraft == false'
+check_called "-f base=release" "pr-create honours --base"
+if run pr-create --title t --body-file "$BODY" > /dev/null 2>&1; then fail "pr-create without --head is a usage error"; else pass "pr-create without --head is a usage error"; fi
+
+check "pr-edit rewrites the body" "$(run pr-edit 20 --body-file "$BODY" || true)" '.item == 20 and .result == "edited"'
+check_called "-X PATCH repos/acme/widgets/pulls/20 -F body=@$BODY" "pr-edit patches the PR"
+
+check "to-draft on a PR already a draft reports draft" "$(run to-draft 20 || true)" '.item == 20 and .result == "draft"'
+check_not_called "pulls/20/ccr/convert_to_draft" "to-draft writes nothing to a PR already a draft: the proxy refuses that"
+check "to-draft returns a PR to draft" "$(run to-draft 21 || true)" '.item == 21 and .result == "draft"'
+check_called "-X POST repos/acme/widgets/pulls/21/ccr/convert_to_draft" "to-draft uses the /ccr/ route"
+check_not_called "ready_for_review" "the script never marks a PR ready"
+touch "$FAKE_STATE/ccr-404"
+check "to-draft falls back to gh pr ready --undo where /ccr/ is absent" "$(run to-draft 21 || true)" '.result == "draft"'
+check_called "pr ready --undo 21 -R acme/widgets" "the CLI fallback names the repository"
+
+out="$(run merge 21 --sha h21 || true)"
+check "merge squashes the verified head" "$out" '.item == 21 and .result == "merged" and .sha == "m1"'
+check_called "-X PUT repos/acme/widgets/pulls/21/merge -f merge_method=squash -f sha=h21" "merge pins the head SHA, as --match-head-commit did"
+if run merge 21 --sha h21old > /dev/null 2>&1; then
+  fail "merge refuses a head that moved since it was verified"
+else
+  pass "merge refuses a head that moved since it was verified"
+fi
+if run merge 21 > /dev/null 2>&1; then fail "merge without --sha is a usage error"; else pass "merge without --sha is a usage error"; fi
+
+# ---------------------------------------------------------------- checks
+
+use status
+out="$(run checks 20 || true)"
+check "checks reports pending runs and statuses on the PR head" "$out" \
+  '.item == 20 and .head == "h20" and .state == "pending" and .pending == ["test"] and .failing == [] and .total == 3'
+out="$(DELEGATE_STATUS_POLL=0 run checks 20 --wait 60 || true)"
+check "checks --wait polls until nothing is pending" "$out" '.state == "pass"'
+check "a re-run check counts by its latest run" "$out" '.failing == [] and .total == 3'
+out="$(run checks 21 || true)"
+check "a failing run or status fails the checks" "$out" '.state == "fail" and ([.failing[].name] | sort) == ["deploy", "test"]'
+check "a failing run names its Actions run and its failure annotations" "$out" \
+  '.failing[] | select(.name == "test") | .run == 9100 and .summary == "2 tests failed" and .annotations == [{"path": "src/import.test.ts", "line": 12, "message": "expected [] to equal [1]"}]'
+check "a skipped run does not fail the checks" "$out" 'all(.failing[]; .name != "lint")'
+check "a status counts by its latest report" "$out" '.failing[] | select(.name == "deploy") | .summary == "Deploy failed"'
+check "no checks reported is none, not pass" "$(run checks 22 || true)" '.state == "none" and .total == 0'
+: > "$FAKE_STATE/calls.log"
+start=$(date +%s)
+out="$(DELEGATE_STATUS_POLL=0 run checks 21 --wait 60 || true)"
+if [ $(($(date +%s) - start)) -lt 5 ] && [ "$(printf '%s' "$out" | jq -r .state)" = fail ]; then
+  pass "checks --wait stops at the first failure"
+else
+  fail "checks --wait stops at the first failure"
+fi
+
+check "merged-sizes reads the newest merged PRs' sizes" "$(run merged-sizes || true)" \
+  '.prs == [{"number": 19, "additions": 190, "deletions": 19, "changedFiles": 3}, {"number": 17, "additions": 170, "deletions": 17, "changedFiles": 3}]'
 
 # ---------------------------------------------------------------- Pick skip cache
 
@@ -341,9 +457,9 @@ check_not_called "issues/35/comments" "an unchanged unanswered question is not r
 check_not_called "issues/36/comments" "a recently claimed issue is not re-read"
 check "a cached skip keeps its state" "$out" "$(issue 35) | .state == \"waiting-on-human\" and .cached == true"
 
-jq 'map(if .number == 32 then .updatedAt = "2026-10-02T11:59:00Z" else . end)' \
+jq 'map(if .number == 32 then .updated_at = "2026-10-02T11:59:00Z" else . end)' \
   "$FAKE_STATE/issues.json" > "$FAKE_STATE/issues.tmp" && mv "$FAKE_STATE/issues.tmp" "$FAKE_STATE/issues.json"
-jq 'map(if .number == 35 then .updatedAt = "2026-10-02T11:59:00Z" else . end)' \
+jq 'map(if .number == 35 then .updated_at = "2026-10-02T11:59:00Z" else . end)' \
   "$FAKE_STATE/issues.json" > "$FAKE_STATE/issues.tmp" && mv "$FAKE_STATE/issues.tmp" "$FAKE_STATE/issues.json"
 : > "$FAKE_STATE/calls.log"
 run status --cache "$CACHE" > /dev/null

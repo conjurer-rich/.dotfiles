@@ -1,7 +1,10 @@
 [
   {
     "number": 32,
-    "state": "OPEN",
-    "headRefOid": "ddd"
+    "state": "open",
+    "merged_at": null,
+    "head": {
+      "sha": "ddd"
+    }
   }
 ]
