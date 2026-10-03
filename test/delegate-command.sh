@@ -49,7 +49,31 @@ reject_regex() {
 
 require_text "$INSTALLER" 'COMMAND_FILES=(setup.md plan.md continue.md delegate.md)' "the installer ships /delegate"
 reject_regex "$COMMAND" 'fast-flow-board|conjurer-rich|flow-canvas|apps/web|ux-evidence|agent-ready' "the command names no project or its settings"
-require_text "$COMMAND" 'cat .claude/delegation.md' "the command reads the project's settings file"
+render_settings_line() {
+  local dir="$1" line
+
+  line="$(grep -A1 -F 'Project delegation settings' "$COMMAND" | sed -n '2s/^!`\(.*\)`$/\1/p')"
+  (cd "$dir" && GIT_CEILING_DIRECTORIES="$SANDBOX" bash -c "$line")
+}
+
+SANDBOX="$(mktemp -d)"
+trap 'rm -rf "$SANDBOX"' EXIT
+git init -q "$SANDBOX/project"
+mkdir -p "$SANDBOX/project/.claude" "$SANDBOX/project/apps/web/src" "$SANDBOX/elsewhere"
+echo "project settings" > "$SANDBOX/project/.claude/delegation.md"
+
+if [ "$(render_settings_line "$SANDBOX/project/apps/web/src")" = "project settings" ]; then
+  pass "the command reads the project's settings file from a subdirectory"
+else
+  fail "the command reads the project's settings file from a subdirectory"
+fi
+
+if [ "$(render_settings_line "$SANDBOX/elsewhere")" = "none" ]; then
+  pass "outside a repository the settings read none"
+else
+  fail "outside a repository the settings read none"
+fi
+
 require_text "$COMMAND" 'is not set up here' "a project without settings stops instead of guessing"
 require_text "$COMMAND" 'gh repo view --json nameWithOwner' "owner and repo come from the repository"
 
