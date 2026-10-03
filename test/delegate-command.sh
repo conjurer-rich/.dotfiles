@@ -60,6 +60,7 @@ require_text "$COMMAND" 'Several sessions can run `/loop /delegate` at once' "th
 require_text "$COMMAND" '- **Session title** (skill):' "the command says the chat is named after the item held"
 require_text "$COMMAND" 'Bash(jq:*)' "the CLI rename's jq call needs no permission prompt"
 require_text "$COMMAND" 'mcp__claude-code-remote__set_session_title' "the cloud rename tool needs no permission prompt"
+require_text "$COMMAND" 'because Claude Code on the web blocks GitHub GraphQL' "the command says why writes go through the script"
 # The orchestrator mostly routes once the bookkeeping is a script, so the
 # loop session can run on a cheaper model; the implementer and Land's
 # reviewer stay on the strongest. Recommend it, never pin it.

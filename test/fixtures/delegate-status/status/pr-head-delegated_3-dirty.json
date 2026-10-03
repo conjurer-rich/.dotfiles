@@ -1,7 +1,10 @@
 [
   {
     "number": 31,
-    "state": "MERGED",
-    "headRefOid": "ccc"
+    "state": "closed",
+    "merged_at": "2026-10-01T09:00:00Z",
+    "head": {
+      "sha": "ccc"
+    }
   }
 ]

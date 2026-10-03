@@ -74,18 +74,19 @@ require_text '<!-- delegator -->' "delegator comments carry the marker"
 require_text 'Every comment and thread reply the delegator posts therefore ends with' "every delegator post is marked"
 require_text 'does not end in `[bot]`' "bot comments never need an answer"
 require_text 'does not contain `<!-- preview-`' "preview stickies never need an answer"
-require_script 'gh_json api --paginate "repos/$REPO/issues/$1/comments"' "Review reads top-level PR comments"
+require_script 'list_of "repos/$REPO/issues/$1/comments"' "Review reads top-level PR comments"
 require_text 'Merge a PR, except through **Land** with `land` on.' "merging is confined to Land"
-require_text '`gh pr ready` runs only with `--undo`' "only the human marks a PR ready"
+require_text 'Mark a PR ready for review; only the human does. `delegate-status to-draft` is the delegator'"'"'s one draft-state change.' "only the human marks a PR ready"
+reject_regex 'ready_for_review`? *(route|endpoint)|ccr/ready_for_review' "the skill never names the route that marks a PR ready"
 reject_regex 'merge a PR, resolve a review thread' "the unconditional never-merge line is gone"
 
 # Task 2: Watch
 require_text '# Watch' "Watch entry point exists"
-require_text 'READY_FOR_REVIEW_EVENT' "Ready is read from the PR timeline"
+require_text 'counted over the PR timeline'"'"'s `ready_for_review` events only' "Ready is read from the PR timeline"
 # timelineItems' totalCount ignores itemTypes and counts every timeline item,
 # so a gate on it calls every PR ready. filteredCount is the filtered count.
-require_script 'ready: timelineItems(itemTypes:[READY_FOR_REVIEW_EVENT]){ filteredCount }' "Ready counts only ready events"
-require_text '`ready.filteredCount` is above 0' "Ready gates on the filtered count"
+require_script '([$tl[] | select(. == "ready_for_review")] | length) as $ready' "Ready counts only ready events"
+require_text '`isDraft` is false and `ready` is above 0' "Ready gates on the ready-event count"
 reject_regex 'totalCount' "no gate reads the unfiltered timeline count"
 if grep -q totalCount "$DELEGATE_STATUS"; then fail "the script never reads the unfiltered timeline count"; else pass "the script never reads the unfiltered timeline count"; fi
 require_text 'never Ready' "a PR opened as non-draft is never landed"
@@ -106,7 +107,8 @@ require_text 'git merge --no-edit origin/<default branch>' "conflicts are resolv
 require_text '<!-- delegator land: reviewed <sha> -->' "Land records the SHA it verified"
 require_text 'no checks reported' "a docs-only PR with no CI checks can land"
 require_text 'Check `isDraft` again' "a PR returned to draft mid-land is not merged"
-require_text '--squash --match-head-commit <verified SHA>' "only the verified head is merged"
+require_text '`delegate-status merge <PR> --sha <verified SHA>`' "only the verified head is merged"
+require_script '-f merge_method=squash -f sha="$SHA"' "the merge is a squash pinned to the verified SHA"
 require_text 'Fix or answer, then mark the PR ready again.' "bail-out hands the PR back to the human"
 reject_regex 'git rebase|git push (--force|-f)' "Land never rebases or force-pushes"
 require_text 'force-push, or rebase a pushed branch' "the Never list forbids force-push and rebase"
@@ -117,12 +119,13 @@ require_text 'continue only when every changed path is one the project'"'"'s CI 
 require_text 'Steps 1–3 always run, including on resume.' "resuming Land still checks eligibility"
 require_text 'Bail-out** with the reason `commits after Ready`' "a commit pushed after Ready is not landed"
 require_text '<!-- delegator reply-to: <comment id> -->' "a top-level answer names the comment it answers"
-require_script 'reviews(first:100){ nodes{ databaseId body author{ login __typename } } }' "a review summary body is read as a comment"
+require_script 'list_of "repos/$REPO/pulls/$number/reviews?per_page=100"' "a review summary body is read as a comment"
 require_text 'review body (`review`)' "Review answers review bodies too"
 require_text 'Never go to **Blocked** from **Watch** or **Land**.' "an unattended run never waits on approval"
-require_text 'gh pr checks <PR> --watch --fail-fast` as a background task' "the CI wait runs in the background"
+require_text 'delegate-status checks <PR> --wait 2400` as a background task' "the CI wait runs in the background"
 reject_regex 'timeout 540' "no foreground CI wait sized to one tool call"
-require_text 'If `gh pr merge` exits non-zero, go to **Bail-out**' "a refused merge hands the PR back"
+require_text 'If `merge` exits non-zero or prints `refused`, go to **Bail-out**' "a refused merge hands the PR back"
+require_text 'which squash-merges only while the head is still that SHA' "Land merges only the head it verified"
 reject_regex 'search "head:' "Watch filters branches locally, not by fuzzy search"
 
 # Dry run 2 findings (#1708, #1710)
@@ -196,7 +199,7 @@ require_text 'Confirm the claim is still yours (**Claims**) before dispatching. 
 require_text 'Confirm the claim is still yours, then dispatch the ship subagent (**Work** step 10'"'"'s brief without PR creation: it commits from the message file and pushes with no force flag' "Review confirms its claim before the ship subagent pushes"
 require_text 'then `git push`, with no force flag; it returns the new head SHA' "Land's ship subagent pushes with no force flag"
 require_text 'Confirm the claim is still yours, then dispatch the ship subagent (**Work** step 10'"'"'s brief without PR creation): step 4'"'"'s merge' "Land confirms its claim before the ship subagent pushes"
-require_text 'Otherwise confirm the claim is still yours and run `gh pr merge <PR>' "Land confirms its claim before merging"
+require_text 'Otherwise confirm the claim is still yours and run `delegate-status merge <PR>' "Land confirms its claim before merging"
 # Review of the first draft: a lapsed claim keeps its low id, so renewing it
 # blindly steals the item back; and a session that released on opening its PR
 # left a window for another session to claim the issue again.
@@ -218,7 +221,7 @@ require_script '"repos/$REPO/issues/$n/labels" -f "labels[]=$PROGRESS_LABEL"' "a
 require_text 'The winner adds the label' "only the winning session adds the label"
 require_text 'which removes the label first' "every release removes the label"
 require_script 'gh api -X DELETE "repos/$REPO/issues/$1/labels/$LABEL_PATH"' "the script removes the label through the labels endpoint"
-require_script 'gh label create -R "$REPO" "$PROGRESS_LABEL"' "a missing label is created"
+require_script 'gh api -X POST "repos/$REPO/labels" -f name="$PROGRESS_LABEL"' "a missing label is created"
 require_text 'Never `--force`' "an existing label keeps the human's colour and description"
 require_text '**Stale label.**' "a crashed session's label is cleaned up"
 require_text 'remove the label as **Stale label** in **Claims** says, and keep it as a candidate' "Pick does not skip an issue on a stale label"
@@ -270,7 +273,7 @@ require_text 'Renew the claim, then hand the actionable threads' "Review renews 
 require_text 'Renew the claim, then dispatch one subagent with `subagent_type: general-purpose`, `model: opus`, `run_in_background: true`' "Land renews before its review wait"
 require_text '**Wait for CI.** Renew the claim, then run' "Land renews before its CI wait"
 # D. Pick caches skips across loop passes.
-require_script 'number,title,labels,createdAt,updatedAt' "Pick lists updatedAt"
+require_script 'updatedAt: .updated_at' "Pick lists updatedAt"
 require_text '`pick-cache.json`' "Pick keeps a skip cache"
 require_text 're-reads a cached issue'"'"'s comments **only** when its `updatedAt` is later than the cached value' "a cached skip is re-read only when the issue changed"
 require_text 'A cached skip is reported once per run' "a cached skip is reported once"
@@ -365,6 +368,26 @@ require_text 'leave it running for step 9'"'"'s re-walk' "the stack stays up for
 require_text 're-walks them on the stack it left running' "the re-walk does not boot the stack again"
 reject_regex 'it boots and signs in per the Recipe, re-walks' "the repair round no longer reboots the stack"
 require_text 'send the walkthrough subagent one message to stop the stack' "a run never leaves the stack running"
+
+# Claude Code on the web blocks GitHub GraphQL, and `gh pr`, `gh issue`,
+# `gh label` and `gh repo view` are GraphQL underneath, so 4.26.0 failed on
+# its first call there. The references make every GitHub write through
+# delegate-status or `gh api` REST, and never name a GraphQL-backed command.
+for f in "$SKILL_DIR"/SKILL.md "$SKILL_DIR"/references/*.md; do
+  if grep -E '`gh (pr|issue|label|repo view)[ `]|gh api graphql|addPullRequestReviewThreadReply' "$f" | grep -vq '^- Call GraphQL: '; then
+    fail "$(basename "$f") names no GraphQL-backed gh command"
+  else
+    pass "$(basename "$f") names no GraphQL-backed gh command"
+  fi
+done
+require_text 'Call GraphQL: `gh pr`, `gh issue`, `gh label`, `gh repo view`, `gh api graphql`.' "the Never list forbids GraphQL"
+require_text 'delegate-status reply <PR> <thread> --body-file <file>' "thread replies go through the REST replies endpoint"
+require_text 'delegate-status pr-create --head <branch> --title "<subject>" --body-file <file>' "Work opens its PR over REST"
+require_text 'delegate-status comment N --body-file <file>' "issue comments go over REST"
+require_text '1. `delegate-status to-draft <PR>`.' "Bail-out returns the PR to draft over REST"
+require_text 'is briefed with `delegate-status`'"'"'s absolute path and `--repo`' "subagents that write to GitHub can reach the script"
+
+require_text 'with `gh api` REST calls only' "the poll runs over REST"
 
 # Progressive disclosure. Every mode loaded the whole 35-50 KB skill, a quiet
 # Watch pass included. The core keeps what every mode needs; each entry point

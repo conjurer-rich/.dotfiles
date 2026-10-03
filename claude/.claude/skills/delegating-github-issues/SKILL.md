@@ -7,7 +7,7 @@ description: Take a triaged GitHub issue end-to-end to a reviewable pull request
 
 You are the delegator. You do not write production code, and you do no mechanical work in your own context: subagents do it under the **Hand-back contract**, and you read their verdicts, not their output. You decide eligibility, budget, claims, acceptance criteria, the size check and tier, and deferrals, and you write the PR body and commit message files. Bootstrap, implementation, the independent checks, the walkthrough, commit, evidence push, PR creation and issue comments are each a subagent's job. You never enter a worktree. A human reviews. With `land` on, the delegator also merges, but only a PR the human marked Ready for review, only through **Land**.
 
-The **Stop rule** ends a run before it fills its context, as the aborted run that shaped this skill did: it worked three issues at once, ran browser walkthroughs inline and read every subagent report in full.
+The **Stop rule** ends a run before it fills its context; the aborted run that shaped this skill worked three issues at once, ran walkthroughs inline and read every subagent report in full.
 
 ## Parameters
 
@@ -44,7 +44,7 @@ Several delegator sessions can run at once through one `gh` login, so a session 
 
 **Session name.** Before its first claim, a session names itself with 8 random hex characters. It is not the **Session title**; the two never mix.
 
-**`delegate-status`.** `scripts/delegate-status`, in this skill's directory, runs the claims and every fixed query and prints one JSON line. Run it from the main checkout with `--repo <owner>/<repo> --session <session>` and each parameter the project changed (`--label`, `--rank-labels`, `--prefix`, `--progress-label`, `--claim-ttl <seconds>`, `--max-worktrees`, `--max-open-prs`, `--land on`). Keep claim ids in `claims.json` in the run's scratch directory. On a non-zero exit, report its last line and stop.
+**`delegate-status`.** `scripts/delegate-status`, in this skill's directory, runs the claims and every fixed query and prints one JSON line. Run it from the main checkout with `--repo <owner>/<repo> --session <session>` and each parameter the project changed (`--label`, `--rank-labels`, `--prefix`, `--progress-label`, `--claim-ttl <seconds>`, `--max-worktrees`, `--max-open-prs`, `--land on`). Keep claim ids in `claims.json` in the run's scratch directory. On a non-zero exit, report its last line and stop. It also makes every GitHub write outside git, and waits for CI, over REST: Claude Code on the web blocks GraphQL.
 
 - **Claim.** `claim <n>` prints `won` with the `id` (and `open_pr` when a delegated PR is open for the issue), or `lost` with the `holder`. It reuses this session's live claim, so a session never claims an item twice. The loser deletes its own claim comment; a human-started entry point says `#<n> is claimed by delegator session <holder>` and stops. The winner adds the label, creating it if missing; Never `--force`.
 - **Confirm.** `confirm <n> <id>` prints `live` or `lost`. Confirm before any push, PR creation or merge. On `lost`, write nothing more to the item, report it lost to the holder, and leave staged work in the worktree.
@@ -98,7 +98,8 @@ Use these eight headings, in this order, every time. A section that does not app
 
 - Add `<label>` to an issue, resolve a review thread, force-push, or rebase a pushed branch.
 - Merge a PR, except through **Land** with `land` on.
-- Mark a PR ready for review. `gh pr ready` runs only with `--undo`; only the human marks a PR ready.
+- Mark a PR ready for review; only the human does. `delegate-status to-draft` is the delegator's one draft-state change.
+- Call GraphQL: `gh pr`, `gh issue`, `gh label`, `gh repo view`, `gh api graphql`.
 - Remove a worktree whose PR has not merged, or delete any branch other than the local `<branch_prefix>` branch of a worktree being reclaimed — and that one only with `git branch -d`.
 - Kill a process to free a worktree directory; report the leftover path instead.
 - Edit or delete another session's claim. A session touches only its own claim comments.
