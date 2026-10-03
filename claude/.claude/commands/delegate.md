@@ -11,7 +11,7 @@ Repository:
 !`gh repo view --json nameWithOwner -q .nameWithOwner 2>/dev/null || git remote get-url origin 2>/dev/null || echo "unknown: no origin remote"`
 
 Project delegation settings (`.claude/delegation.md`):
-!`cat .claude/delegation.md 2>/dev/null || echo "none"`
+!`cat "$(git rev-parse --show-toplevel 2>/dev/null)/.claude/delegation.md" 2>/dev/null || echo "none"`
 
 ## Settings
 
