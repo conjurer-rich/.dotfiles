@@ -1,13 +1,13 @@
 ---
 name: delegating-github-issues
-description: Take a triaged GitHub issue end-to-end to a reviewable pull request in an isolated worktree, then address review comments on request. With the land parameter on, also watch delegated PRs and review, simplify and merge one the human marked Ready for review. Use when a project command such as /delegate asks to pick up an issue, work a specific issue number, address review comments on a PR the delegator opened, watch delegated PRs, land one, or run one unattended pass that watches and then picks and works the next issue (for example under `/loop /delegate`). Not for triage, merging PRs the delegator did not open, or writing production code in the calling session.
+description: Take a triaged GitHub issue end-to-end to a reviewable pull request in an isolated worktree, then address review comments on request. Watch delegated PRs and sync one that has a merge conflict. With the land parameter on, also review, simplify and merge one the human marked Ready for review. Use when a project command such as /delegate asks to pick up an issue, work a specific issue number, address review comments on a PR the delegator opened, watch delegated PRs, sync or land one, or run one unattended pass that watches and then picks and works the next issue (for example under `/loop /delegate`). Not for triage, merging PRs the delegator did not open, or writing production code in the calling session.
 ---
 
 # Delegating GitHub issues
 
 You are the delegator. You do not write production code, and you do no mechanical work in your own context: subagents do it under the **Hand-back contract**, and you read their verdicts, not their output. You decide eligibility, budget, claims, acceptance criteria, the size check and tier, and deferrals, and you write the PR body and commit message files. Bootstrap, implementation, the independent checks, the walkthrough, commit, evidence push, PR creation and issue comments are each a subagent's job. You never enter a worktree. A human reviews. With `land` on, the delegator also merges, but only a PR the human marked Ready for review, only through **Land**.
 
-The **Stop rule** ends a run before it fills its context; the aborted run that shaped this skill worked three issues at once, ran walkthroughs inline and read every subagent report in full.
+The **Stop rule** ends a run before it fills its context.
 
 ## Parameters
 
@@ -48,7 +48,7 @@ Several delegator sessions can run at once through one `gh` login, so a session 
 
 - **Claim.** `claim <n>` prints `won` with the `id` (and `open_pr` when a delegated PR is open for the issue), or `lost` with the `holder`. It reuses this session's live claim, so a session never claims an item twice. The loser deletes its own claim comment; a human-started entry point says `#<n> is claimed by delegator session <holder>` and stops. The winner adds the label, creating it if missing; Never `--force`.
 - **Confirm.** `confirm <n> <id>` prints `live` or `lost`. Confirm before any push, PR creation or merge. On `lost`, write nothing more to the item, report it lost to the holder, and leave staged work in the worktree.
-- **Renew.** `renew <n> <id>` confirms, then rewrites the claim's first line to end `renewed <UTC time>`. A lapsed claim keeps its low id, so renewing it blindly would take the item back from the session that claimed it since: a lapsed claim prints `lost` and nothing is written. Renew only right before a long step, Work steps 6, 7, 8 and 9, Review step 5, Land steps 5 and 7, so each starts with a whole `claim_ttl`. The implementer handoff is the longest; a project whose handoffs can outlast `claim_ttl` raises it. A lapse is still caught by the next Confirm.
+- **Renew.** `renew <n> <id>` confirms, then rewrites the claim's first line to end `renewed <UTC time>`. A lapsed claim keeps its low id, so renewing it blindly would take the item back from the session that claimed it since: a lapsed claim prints `lost` and nothing is written. Renew only right before a long step, Work steps 6, 7, 8 and 9, Review step 5, Land steps 5 and 7, Sync steps 3 and 4, so each starts with a whole `claim_ttl`. The implementer handoff is the longest; a project whose handoffs can outlast `claim_ttl` raises it. A lapse is still caught by the next Confirm.
 - **Release.** Every stop releases the claim with `release <n> <id>`, which removes the label first. A stop that posted nothing else on the item deletes the claim comment (`--delete`); any other stop rewrites it (`--reason "<one-line reason>"`) as ``Released by delegator session `<session>`: <reason>.`` and `<!-- delegator claim-released: <session> -->`. It refuses a comment that is not this session's.
 
 A Land waiting on a background task has not stopped: its claim and label hold. Review steps inside Land use Land's claim. A crashed session's claims lapse after `claim_ttl`; the human frees one sooner by deleting it.
@@ -70,9 +70,10 @@ Read only the reference files for the entry point you are running. Paths are rel
 | **Pick** | `references/pick.md` |
 | **Work** `#N` | `references/work.md` |
 | **Review** `#PR` | `references/review.md` and `references/work.md` (its steps 5–10: bootstrap, handoff, checks, walkthrough, repair round, ship) |
-| **Watch** | `references/watch.md` and `references/reclaim.md`, then the files for any Review or Land it runs |
+| **Watch** | `references/watch.md` and `references/reclaim.md`, then the files for any Review, Land or Sync it runs |
 | **Run** | `references/run.md`, `references/watch.md`, `references/reclaim.md` and `references/pick.md`; `references/work.md` once Pick finds one |
 | **Land** `#PR` | `references/land.md`, `references/review.md` (its step 2, and steps 4–6 when step 3 has review to answer), `references/reclaim.md` and `references/work.md` (its steps 5, 6 and 10) |
+| **Sync** `#PR` | `references/sync.md`, then step 4 of `references/land.md`, step 2 of `references/review.md` and steps 5, 6 and 10 of `references/work.md` |
 | **Blocked**, **Preview oracle rule** | `references/blocked-and-oracle.md`, when Work or Review sends you there or `oracle` is on |
 | **Hand-back contract** | `references/hand-back.md`, before dispatching any subagent |
 | **Session title**, **Running in a cloud container** | `references/session.md`, when the title changes |
@@ -109,7 +110,7 @@ Use these eight headings, in this order, every time. A section that does not app
 - Re-run, or hand to another agent, a command that a subagent's own permission system refused: a refusal is an answer, not an obstacle.
 - Put a model identifier in anything pushed: commit messages, PR titles or bodies, comments or code.
 - Work a second issue in the same session while one is in progress; run another session instead.
-- Put `<progress_label>` on an item without holding a live claim on it, or leave it on one you released. The label says an agent is working on the item now, and a wrong one sends the human to look at nothing.
+- Put `<progress_label>` on an item without holding a live claim on it, or leave it on one you released.
 - Run the full test suite locally unless `local_full_suite` is on, and never at the repository root in the foreground or to check a single change.
 - Point a browser at a deployed preview URL.
 - Continue after an ambiguous review comment without the human's answer.

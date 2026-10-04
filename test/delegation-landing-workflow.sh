@@ -406,6 +406,18 @@ require_text 'Otherwise leave a background poll running between passes' "the CLI
 require_text 'with `gh api` REST calls only' "the poll runs over REST"
 require_text 'Subscribe the PR as **Watch** step 6 says.' "Work subscribes the PR it opens"
 
+# A delegated PR that fell into a merge conflict sat Idle until the human
+# marked it ready, so Watch now syncs it, resolving only textual conflicts,
+# and tells the human once per head when it cannot.
+require_text '**Conflicted** (`conflicted`)' "Watch classes a PR with a merge conflict"
+require_text 'Then run **Sync** on each Conflicted PR.' "Watch syncs conflicted PRs"
+require_text 'Sync never touches a **Ready** PR' "Sync leaves a Ready PR to Land"
+require_text 'dispatch **Land** step 4'"'"'s sync subagent with its brief unchanged' "Sync resolves only the textual conflicts Land may"
+require_text 'Abort the in-progress merge (`git merge --abort`) and push nothing.' "Sync pushes nothing on a semantic conflict"
+require_text '<!-- delegator sync: conflict <sha> -->' "Sync marks the head whose conflict it reported"
+require_script '<!-- delegator sync: conflict ' "the script reads the sync marker"
+require_script 'mergeable: .mergeable' "the script reads mergeability"
+
 # Progressive disclosure. Every mode loaded the whole 35-50 KB skill, a quiet
 # Watch pass included. The core keeps what every mode needs; each entry point
 # lives in its own reference file, which the core's index names.
@@ -428,7 +440,7 @@ if [ -x "$SKILL_DIR/scripts/delegate-status" ]; then
 else
   fail "the bookkeeping script ships executable"
 fi
-for ref in pick work review watch run land blocked-and-oracle hand-back session reclaim; do
+for ref in pick work review watch run land sync blocked-and-oracle hand-back session reclaim; do
   if [ -f "$SKILL_DIR/references/$ref.md" ] && grep -Fq -- "\`references/$ref.md\`" "$CORE"; then
     pass "references/$ref.md exists and the core's index names it"
   else

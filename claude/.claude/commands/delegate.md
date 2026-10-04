@@ -1,6 +1,6 @@
 ---
 description: Keep delegating under /loop (watch delegated PRs, then pick and work the next issue), or work a labelled GitHub issue to a reviewable PR, pick the next one, address review comments, watch delegated PRs, or land a PR marked ready
-argument-hint: "[run] | #<issue> | next | review #<pr> | watch | land #<pr>"
+argument-hint: "[run] | #<issue> | next | review #<pr> | watch | land #<pr> | sync #<pr>"
 allowed-tools: Read, Glob, Grep, Bash(git:*), Bash(gh:*), Bash(pnpm:*), Bash(npm:*), Bash(npx:*), Bash(timeout:*), Bash(jq:*), Bash(*/delegating-github-issues/scripts/delegate-status:*), Agent, SendMessage, mcp__claude-code-remote__get_session, mcp__claude-code-remote__set_session_title, mcp__claude-code-remote__subscribe_pr_activity, mcp__claude-code-remote__unsubscribe_pr_activity
 ---
 
@@ -29,7 +29,8 @@ Parse `$ARGUMENTS`:
 - `review #<n>` or `review <n>` → **Review** PR `n`.
 - `watch` → one **Watch** pass. Run it as `/loop /delegate watch` to keep watching.
 - `land #<n>` or `land <n>` → **Land** PR `n`.
-- Anything else → print the six forms above and stop.
+- `sync #<n>` or `sync <n>` → **Sync** PR `n`: merge the default branch into a delegated PR with a merge conflict. Watch runs it on its own.
+- Anything else → print the seven forms above and stop.
 
 ## Model
 
