@@ -90,6 +90,7 @@ require_text "$COMMAND" 'because Claude Code on the web blocks GitHub GraphQL' "
 # loop session can run on a cheaper model; the implementer and Land's
 # reviewer stay on the strongest. Recommend it, never pin it.
 require_text "$COMMAND" '## Model' "the command has model guidance"
+require_text "$COMMAND" '`sync #<n>` or `sync <n>` → **Sync** PR `n`' "the command can sync a conflicted PR by hand"
 require_text "$COMMAND" 'can run on a cheaper model' "the loop session may run on a cheaper model"
 require_text "$COMMAND" 'keep `model: opus`' "the implementer and Land reviewer stay on the strongest model"
 if sed -n '1,/^---$/{/^---$/!p}' "$COMMAND" | tail -n +2 | grep -q '^model:'; then

@@ -152,7 +152,7 @@ def human_reply:
   (.body // "") | (contains("<!-- delegator") or contains("[Claude Code](https://claude.")) | not;
 def pr_norm:
   { number, title, isDraft: (.draft // false), headRefName: .head.ref, headRefOid: .head.sha,
-    createdAt: .created_at, labels: [.labels[]? | {name}] };
+    createdAt: .created_at, labels: [.labels[]? | {name}], mergeable: .mergeable };
 def pr_state:
   if .merged_at != null then "MERGED" elif .state == "open" then "OPEN" else "CLOSED" end;
 def issue_norm:
@@ -447,9 +447,10 @@ query($owner:String!,$repo:String!,$pr:Int!){ repository(owner:$owner,name:$repo
            | {resolved: .isResolved, path, line, comment_ids: [.comments.nodes[].databaseId]}]'
 }
 
-# Classify one delegated PR (one pr_norm object): its claim, what needs an
-# answer (with bodies, under .items), Ready and the latest Land marker. A
-# thread is named by its first comment's id, the one `reply` answers.
+# Classify one delegated PR (one pr_norm object of a single-PR read, which
+# alone carries mergeability): its claim, what needs an answer (with bodies,
+# under .items), Ready, a merge conflict and the latest Land and Sync markers.
+# A thread is named by its first comment's id, the one `reply` answers.
 pr_json() {
   local pr="$1" number comments threads review_comments reviews timeline result
   number="$(printf '%s' "$pr" | jq '.number')"
@@ -485,6 +486,9 @@ pr_json() {
           reviews: [$items[] | select(.kind == "review") | .id] } as $needs
       | ([$c[].body // "" | select(contains("<!-- delegator land: reviewed "))
           | capture("<!-- delegator land: reviewed (?<sha>[^ ]+) -->").sha] | last) as $marker
+      | ([$c[].body // "" | select(contains("<!-- delegator sync: conflict "))
+          | capture("<!-- delegator sync: conflict (?<sha>[^ ]+) -->").sha] | last) as $sync
+      | ($p.mergeable == false) as $conflicted
       | ($needs.threads + $needs.comments + $needs.reviews | length > 0) as $any
       | ([$tl[] | select(. == "ready_for_review")] | length) as $ready
       | { number: $p.number, title: $p.title, isDraft: $p.isDraft, head: $p.headRefOid,
@@ -494,10 +498,13 @@ pr_json() {
           needs_answer: $needs, ready: $ready,
           latest: ({ready_for_review: "ReadyForReviewEvent", committed: "PullRequestCommit"}[$tl | last // ""] // null),
           land_marker: (if $marker == null then null else {sha: $marker, verified: ($marker == $p.headRefOid)} end),
+          mergeable: $p.mergeable, conflicted: $conflicted,
+          sync_marker: (if $sync == null then null else {sha: $sync, current: ($sync == $p.headRefOid)} end),
           items: $items }
       | .class = (if .holder != null then "claimed"
                   elif $land == "on" and ($p.isDraft | not) and $ready > 0 then "ready"
                   elif $any and ($p.isDraft or $land == "off") then "needs-review"
+                  elif $conflicted and $sync != $p.headRefOid then "conflicted"
                   else "idle" end)')"
   printf '%s\n' "$result"
 }
@@ -593,6 +600,7 @@ cmd_status() {
 
   while IFS= read -r pr; do
     [ -n "$pr" ] || continue
+    pr="$(gh_json api "repos/$REPO/pulls/$(printf '%s' "$pr" | jq '.number')" | jq -c "$JQ_DEFS"'pr_norm')"
     result="$(pr_json "$pr" | jq -c 'del(.items)')"
     pr_results="$(jq -c --argjson r "$result" '. + [$r]' <<< "$pr_results")"
   done < <(printf '%s' "$prs" | jq -c --arg p "$PREFIX" '[.[] | select(.headRefName | startswith($p))] | sort_by(.createdAt) | .[]')

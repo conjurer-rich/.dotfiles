@@ -349,6 +349,34 @@ use status
 out="$(run status --land on || true)"
 check "a held issue reports its criteria" "$out" "$(issue 38) | .state == \"held\" and .criteria == \"none\""
 
+# ---------------------------------------------------------------- merge conflicts
+
+# The list endpoint carries no mergeability, so status reads each delegated PR
+# on its own. A conflicted PR that nothing else claims is Conflicted, so Watch
+# syncs it; one whose conflict Sync already reported for this head is idle
+# until the head moves.
+use status
+jq '. + {mergeable: false, mergeable_state: "dirty"}' "$FAKE_STATE/pull-22.json" > "$FAKE_STATE/pull-22.tmp" && mv "$FAKE_STATE/pull-22.tmp" "$FAKE_STATE/pull-22.json"
+jq '. + {mergeable: false, mergeable_state: "dirty"}' "$FAKE_STATE/pull-20.json" > "$FAKE_STATE/pull-20.tmp" && mv "$FAKE_STATE/pull-20.tmp" "$FAKE_STATE/pull-20.json"
+jq '. + {mergeable: true, mergeable_state: "clean"}' "$FAKE_STATE/pull-21.json" > "$FAKE_STATE/pull-21.tmp" && mv "$FAKE_STATE/pull-21.tmp" "$FAKE_STATE/pull-21.json"
+out="$(run status --land on || true)"
+check_called "api repos/acme/widgets/pulls/22" "status reads each delegated PR for its mergeability"
+check "a conflicted PR nothing else claims is Conflicted" "$out" "$(pr 22) | .class == \"conflicted\" and .mergeable == false and .conflicted"
+check "a conflicted PR with comments to answer still needs review first" "$out" "$(pr 20) | .class == \"needs-review\" and .conflicted"
+check "a mergeable PR is not conflicted" "$out" "$(pr 21) | .mergeable == true and (.conflicted | not)"
+check "unknown mergeability is not a conflict" "$out" "$(pr 24) | .mergeable == null and (.conflicted | not) and .class == \"idle\""
+out="$(run pr 22 --land on || true)"
+check "pr reports Conflicted as status does" "$out" '.class == "conflicted" and .sync_marker == null'
+
+printf '%s' '[{"id": 530, "body": "Sync stopped: conflict in src/a.ts.\n<!-- delegator sync: conflict h22 -->\n<!-- delegator -->", "created_at": "2026-10-01T10:00:00Z", "updated_at": "2026-10-01T10:00:00Z", "user": {"login": "rich"}}]' > "$FAKE_STATE/comments-22.json"
+out="$(run pr 22 --land on || true)"
+check "a conflict Sync reported for this head leaves the PR idle" "$out" \
+  '.class == "idle" and .conflicted and .sync_marker == {"sha": "h22", "current": true}'
+jq '.head.sha = "h22b"' "$FAKE_STATE/pull-22.json" > "$FAKE_STATE/pull-22.tmp" && mv "$FAKE_STATE/pull-22.tmp" "$FAKE_STATE/pull-22.json"
+out="$(run pr 22 --land on || true)"
+check "a new head after a reported conflict is Conflicted again" "$out" \
+  '.class == "conflicted" and .sync_marker == {"sha": "h22", "current": false}'
+
 # ---------------------------------------------------------------- one PR
 
 # Review and Land read one PR: its class, and the bodies of what needs an

@@ -9,9 +9,10 @@ The chat's name is how the human finds one delegator session among several, in t
 | **Work** step 2, once the claim on issue N wins | `#N <issue title>` |
 | **Review** step 1, once the claim on PR P wins | `Review PR #P <PR title>` |
 | **Land** step 1, once the claim on PR P wins | `Land PR #P <PR title>` |
+| **Sync** step 1, once the claim on PR P wins | `Sync PR #P <PR title>` |
 | A **Watch** or **Run** pass ends holding no claim | `/delegate watching <owner>/<repo>` |
 
-Cut the item's title at a word boundary with `…` so the whole stays within 60 characters. A Work, Review or Land the human started by hand keeps its item's title when it stops, and so does a run that trips the **Stop rule** or goes to **Blocked**: the title still says where the staged work is. Only a Watch or Run pass sets the watching form, and only at its end.
+Cut the item's title at a word boundary with `…` so the whole stays within 60 characters. A Work, Review, Land or Sync the human started by hand keeps its item's title when it stops, and so does a run that trips the **Stop rule** or goes to **Blocked**: the title still says where the staged work is. Only a Watch or Run pass sets the watching form, and only at its end.
 
 Set it with one call, counted in `tool_calls`, and write the new title to `run-state.json`. A rename that fails is reported in one line of the pass report and never stops a run: the title is a convenience.
 
