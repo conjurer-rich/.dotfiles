@@ -42,4 +42,5 @@ Land can resume. Steps 1–3 always run, including on resume. `delegate-status p
    - any commits that stay pushed;
    - `Fix or answer, then mark the PR ready again.`
    - `To accept a finding instead, ask for it as a follow-up.`
+   - When step 4 returned `conflict`, the line `<!-- delegator sync: conflict <sha> -->` with the PR's current `headRefOid`, so the next Watch pass does not run **Sync** on the same conflict.
 4. Stop Land for this PR. The next Watch pass sees a draft. A new Ready click makes a new ready event and a new Land.

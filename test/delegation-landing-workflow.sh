@@ -416,6 +416,7 @@ require_text 'dispatch **Land** step 4'"'"'s sync subagent with its brief unchan
 require_text 'Abort the in-progress merge (`git merge --abort`) and push nothing.' "Sync pushes nothing on a semantic conflict"
 require_text '<!-- delegator sync: conflict <sha> -->' "Sync marks the head whose conflict it reported"
 require_script '<!-- delegator sync: conflict ' "the script reads the sync marker"
+require_text 'When step 4 returned `conflict`, the line `<!-- delegator sync: conflict <sha> -->`' "a Land bail-out on a conflict stops Sync retrying it"
 require_script 'mergeable: .mergeable' "the script reads mergeability"
 
 # Progressive disclosure. Every mode loaded the whole 35-50 KB skill, a quiet
