@@ -1,7 +1,7 @@
 ---
 description: Keep delegating under /loop (watch delegated PRs, then pick and work the next issue), or work a labelled GitHub issue to a reviewable PR, pick the next one, address review comments, watch delegated PRs, or land a PR marked ready
 argument-hint: "[run] | #<issue> | next | review #<pr> | watch | land #<pr> | sync #<pr>"
-allowed-tools: Read, Glob, Grep, Bash(git:*), Bash(gh:*), Bash(pnpm:*), Bash(npm:*), Bash(npx:*), Bash(timeout:*), Bash(jq:*), Bash(*/delegating-github-issues/scripts/delegate-status:*), Agent, SendMessage, mcp__claude-code-remote__get_session, mcp__claude-code-remote__set_session_title, mcp__claude-code-remote__subscribe_pr_activity, mcp__claude-code-remote__unsubscribe_pr_activity
+allowed-tools: Read, Glob, Grep, Bash(git:*), Bash(gh:*), Bash(pnpm:*), Bash(npm:*), Bash(npx:*), Bash(timeout:*), Bash(jq:*), Bash(*/delegating-github-issues/scripts/delegate-status:*), Agent, SendMessage, mcp__claude-code-remote__get_session, mcp__claude-code-remote__set_session_title, mcp__claude-code-remote__subscribe_pr_activity, mcp__claude-code-remote__unsubscribe_pr_activity, mcp__claude-code-remote__create_session
 ---
 
 Current branch:
@@ -46,7 +46,7 @@ These rules apply in every project, alongside its Project rules:
 - **`delegate-status`** (skill): claims, reclaim, the budget count, Pick's eligibility and Watch's PR classification run through the skill's `scripts/delegate-status`, which prints one line of JSON; the delegator never re-derives them with its own `gh` and `jq` calls. The same script makes the GitHub writes (comments, thread replies, PR creation and edits, back to draft, merge) and the CI wait over REST, because Claude Code on the web blocks GitHub GraphQL and with it `gh pr`, `gh issue`, `gh label` and `gh repo view`.
 - **Hand-back contract** (skill): every subagent writes its report to a file and returns at most ten lines; the delegator never reads a diff, screenshot, snapshot or log, never enters a worktree, and never runs `agent-browser`.
 - **Session title** (skill): the chat is named after the issue or PR the session holds (`#N <issue title>`, `Review PR #P …`, `Land PR #P …`), and `/delegate watching <owner>/<repo>` when a Run or Watch pass ends holding nothing, so the human can tell delegator sessions apart in the sidebar or the `/resume` picker. The rename never stops a run.
-- **Stop rule** (skill): a run stops, releases its claims and reports where it got to at 60 % context, 150 main-session tool calls, or the third identical isolation-guard refusal; the next `/loop` pass starts fresh.
+- **Stop rule** (skill): a run stops, releases its claims and reports where it got to at 60 % context, 150 main-session tool calls, or the third identical isolation-guard refusal. Under `/loop` on Claude Code on the web, a context or tool-call stop hands the loop to a new session with an empty context (**Hand-off**), so delegating carries on without the human starting one; elsewhere the loop ends and the human starts a fresh session.
 - Commit trailer `Co-Authored-By: <the model running this delegation> <noreply@anthropic.com>`. Name the model that actually did the work, not a fixed one, or the attribution is false the first time a different model runs `/delegate`. PR footer `🤖 Generated with [Claude Code](https://claude.com/claude-code)`.
 
 The final line of the run is the PR URL, the merge SHA, the Run or Watch pass report, or the one-line reason the run stopped.

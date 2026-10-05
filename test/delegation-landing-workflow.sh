@@ -285,7 +285,19 @@ require_text 'One Run pass works at most one issue through to its PR before the 
 require_text '## Stop rule' "the skill has a Stop rule section"
 require_text 'context use above 60 %, the run has made more than 150 tool calls in the main session, or the same isolation-guard refusal has occurred three times' "the stop rule names its three triggers"
 require_text '`run-state.json`' "the stop counters live in run-state.json"
-require_text 'A `/loop` wakeup after such a stop starts a fresh Run; it does not resume the stopped Work.' "a wakeup after a stop starts fresh"
+require_text 'The new session starts a fresh Run, not the stopped Work.' "a stopped run's successor starts fresh"
+# A /loop wakeup is a new turn in the same session, so a run that stopped at
+# 60 % context tripped the rule again on every later pass and the loop died.
+# A cloud session hands the loop to a new session with an empty context.
+require_text '## Hand-off' "the skill has a Hand-off section"
+require_text 'A skill cannot run `/clear` or `/compact`' "hand-off says why the session cannot clear itself"
+require_text 'the `create_session` tool of the `claude-code-remote` MCP server' "hand-off starts the next session through create_session"
+require_text 'set to the exact `/loop` command this session was started with' "the next session runs the same loop"
+require_text 'and trips the rule before finishing one pass' "a hand-off chain cannot loop forever"
+require_text 'call `ScheduleWakeup` with `stop: true`' "the stopped session ends its own loop"
+require_text 'unsubscribe every PR in `subscribed.json`' "the stopped session stops taking PR events"
+require_text 'Do not archive this session' "the stopped session keeps its staged worktree"
+require_text 'A stop on isolation-guard refusals never hands off' "a guard-refusal stop ends the loop"
 # G. Cloud container guidance.
 require_text '## Running in a cloud container' "the skill has cloud container guidance"
 require_text 'only the GitHub connector attached' "the guidance names the connector cost"
