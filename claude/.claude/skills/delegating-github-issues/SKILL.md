@@ -57,7 +57,7 @@ A Land waiting on a background task has not stopped: its claim and label hold. R
 
 ## Stop rule
 
-A run stops, stops any walkthrough stack it left running, releases its claims and reports when any of these holds: the harness reports context use above 60 %, the run has made more than 150 tool calls in the main session, or the same isolation-guard refusal has occurred three times. The report names the step reached, the worktree path, what is staged there and what the next session should do first. Staged work stays in the worktree. A `/loop` wakeup after such a stop starts a fresh Run; it does not resume the stopped Work.
+A run stops, stops any walkthrough stack it left running, releases its claims and reports when any of these holds: the harness reports context use above 60 %, the run has made more than 150 tool calls in the main session, or the same isolation-guard refusal has occurred three times. The report names the step reached, the worktree path, what is staged there and what the next session should do first. Staged work stays in the worktree. Under `/loop` it then follows **Hand-off**: a wakeup here would trip the rule again.
 
 The counters live in `run-state.json` in the run's scratch directory: `tool_calls` (the delegator's own calls in the main session; a subagent's calls do not count), `guard_refusals` (keyed by the refused command), `step`, `issue`, `worktree`, and the **Session title** state `title` and `ccr_session_id`. The delegator rewrites the file at the start of every numbered step and after every refusal, so a wakeup can read where the stopped run got to without replaying it. Three refusals of the same command mean the command is wrong for this environment, not that a fourth phrasing will pass.
 
@@ -76,7 +76,7 @@ Read only the reference files for the entry point you are running. Paths are rel
 | **Sync** `#PR` | `references/sync.md`, then step 4 of `references/land.md`, step 2 of `references/review.md` and steps 5, 6 and 10 of `references/work.md` |
 | **Blocked**, **Preview oracle rule** | `references/blocked-and-oracle.md`, when Work or Review sends you there or `oracle` is on |
 | **Hand-back contract** | `references/hand-back.md`, before dispatching any subagent |
-| **Session title**, **Running in a cloud container** | `references/session.md`, when the title changes |
+| **Session title**, **Hand-off**, **Running in a cloud container** | `references/session.md` |
 
 ## PR body contract
 

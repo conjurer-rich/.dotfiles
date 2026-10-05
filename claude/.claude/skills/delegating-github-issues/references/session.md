@@ -1,4 +1,4 @@
-# Session title and cloud runs
+# Session title, hand-off and cloud runs
 
 ## Session title
 
@@ -26,6 +26,15 @@ Set it with one call, counted in `tool_calls`, and write the new title to `run-s
   ```
 
   `CLAUDE_CODE_SESSION_ID` is set in every Claude Code session and exactly one transcript carries that name, so the glob expands to the one file. The redirect fails with `ambiguous redirect` when it does not; report that and carry on.
+
+## Hand-off
+
+A skill cannot run `/clear` or `/compact`, and a `/loop` wakeup is a new turn in the same session with the same context, so the only way a loop gets an empty context is a new session. A run under `/loop` that trips the **Stop rule** ends its loop here, handing it to a new session when it can, once it has stopped any walkthrough stack, released its claims and written `run-state.json`:
+
+1. **Check.** Hand off only when the `create_session` tool of the `claude-code-remote` MCP server is in the tool list (Claude Code on the web). A stop on isolation-guard refusals never hands off: the same environment would refuse the same command in the new session. Nor does one when this session was itself started by a hand-off and trips the rule before finishing one pass: a fresh context that fills in one pass would fill again, and the chain would never end. When it does not hand off, skip to step 3 and report `loop ended: <reason>; start a fresh session with /loop /delegate`.
+2. **Start the next session.** Call `create_session` once, counted in `tool_calls`, with `prompt` set to the exact `/loop` command this session was started with (`/loop /delegate`, or with its interval and arguments), `source_url` the main checkout's `origin` URL with no `source_revision`, `title` `/delegate watching <owner>/<repo>`, and `append_system_prompt` set to `Delegator hand-off from session <ccr_session_id> after <trigger> at step <step>.` Leave `environment_id` and `model` unset, so the new session inherits both. A session whose system prompt carries that line was started by a hand-off. The new session starts a fresh Run, not the stopped Work. A call that fails is reported in one line and ends the loop as step 1 says.
+3. **End this session's loop.** Schedule no next pass: under a self-paced `/loop`, call `ScheduleWakeup` with `stop: true`; under an interval `/loop`, delete its job with `CronDelete`. Stop any background poll, and unsubscribe every PR in `subscribed.json`, so no event wakes this session again; the new session subscribes them afresh.
+4. **Report** as the **Stop rule** says, plus the new session's id. Do not archive this session: in a cloud container the stopped Work's staged worktree lives only in this container, and the report is where the human finds it.
 
 ## Running in a cloud container
 
