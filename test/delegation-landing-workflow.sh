@@ -298,6 +298,15 @@ require_text 'call `ScheduleWakeup` with `stop: true`' "the stopped session ends
 require_text 'unsubscribe every PR in `subscribed.json`' "the stopped session stops taking PR events"
 require_text 'Do not archive this session' "the stopped session keeps its staged worktree"
 require_text 'A stop on isolation-guard refusals never hands off' "a guard-refusal stop ends the loop"
+# Hand-off sessions landed under "Other" in the sidebar: create_session with
+# only source_url records no outcome repository, which the sidebar groups by.
+require_text '`outcome_branch` the branch in `ccr-outcome-branch`' "the next session is grouped under its repository"
+require_text 'write its first outcome branch to `ccr-outcome-branch`' "the outcome branch is kept with the session id"
+# A stopped session looked like any other in the sidebar, so the human could
+# not tell which sessions had handed their loop on, or to whom.
+require_text '| **Hand-off** step 3, once the next session starts | `[handed off → <id>] <title>` |' "a handed-off session says so in its title"
+require_text '| **Hand-off** ends the loop without a next session | `[loop ended] <title>` |' "an ended loop says so in its title"
+require_text 'the last 8 characters of the new session'"'"'s id' "the title names the session it handed off to"
 # G. Cloud container guidance.
 require_text '## Running in a cloud container' "the skill has cloud container guidance"
 require_text 'only the GitHub connector attached' "the guidance names the connector cost"
