@@ -1,6 +1,6 @@
 {
   "name": "craft",
-  "version": "4.30.1",
+  "version": "4.30.2",
   "description": "Engineering craft toolkit: TDD, TypeScript strictness, architecture, testing and review skills, agents and commands from the conjurer-rich dotfiles.",
   "author": {
     "name": "conjurer-rich",
