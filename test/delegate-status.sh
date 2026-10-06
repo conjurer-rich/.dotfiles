@@ -248,6 +248,12 @@ check "a progress label with no live claim is stale and the issue is free" "$out
 check "an issue this session holds is held" "$out" "$(issue 38) | .state == \"held\""
 check "a claimed issue's label is not stale" "$out" "$(issue 36) | .stale_label == false"
 
+# Pick reads .pick instead of filtering .issues itself: a filter on a key that
+# does not exist yields nothing, and reads as "no issue to pick".
+check "pick is the first free issue in rank order" "$out" '.pick.number == 31 and (.pick | keys) == ["number", "title"]'
+check "counts tallies the issues by state" "$out" \
+  '.counts == {"claimed": 1, "delegated": 1, "free": 4, "held": 1, "waiting-on-human": 2}'
+
 # PRs
 pr() { printf '.prs[] | select(.number == %s)' "$1"; }
 check "only delegated PRs are classified" "$out" '[.prs[].number] == [20, 21, 22, 23, 24]'
@@ -348,6 +354,28 @@ check "a commit after the last ready event is reported as latest" "$out" '.class
 use status
 out="$(run status --land on || true)"
 check "a held issue reports its criteria" "$out" "$(issue 38) | .state == \"held\" and .criteria == \"none\""
+
+# With nothing free, a held issue with criteria is the pick.
+use status
+jq '[.[] | select(.number == 14 or .number == 36 or .number == 38)]' "$FAKE_STATE/issues.json" > "$FAKE_STATE/issues.next"
+mv "$FAKE_STATE/issues.next" "$FAKE_STATE/issues.json"
+out="$(run status --land on || true)"
+check "with nothing free, pick is a held issue with criteria" "$out" '.pick.number == 38'
+
+# Nothing to pick is null, and counts still says why.
+use status
+jq '[.[] | select(.number == 14 or .number == 32 or .number == 36)]' "$FAKE_STATE/issues.json" > "$FAKE_STATE/issues.next"
+mv "$FAKE_STATE/issues.next" "$FAKE_STATE/issues.json"
+out="$(run status --land on || true)"
+check "with nothing free or held, pick is null" "$out" '.pick == null'
+check "counts names what every skipped issue is waiting on" "$out" \
+  '.counts == {"claimed": 1, "delegated": 1, "waiting-on-human": 1}'
+
+# No eligible issues at all: pick is null and counts is empty, not null.
+use status
+echo '[]' > "$FAKE_STATE/issues.json"
+out="$(run status --land on || true)"
+check "with no issues, pick is null and counts is empty" "$out" '.pick == null and .counts == {}'
 
 # ---------------------------------------------------------------- merge conflicts
 

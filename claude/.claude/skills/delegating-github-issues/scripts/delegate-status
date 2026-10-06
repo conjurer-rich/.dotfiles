@@ -608,7 +608,10 @@ cmd_status() {
   budget="$(budget_json "$worktrees" "$prs")"
 
   jq -nc --argjson w "$worktrees" --argjson b "$budget" --argjson i "$results" --argjson p "$pr_results" \
-    '{worktrees: $w, budget: $b, issues: $i, prs: $p}'
+    '{worktrees: $w, budget: $b, issues: $i, prs: $p,
+      pick: ((first($i[] | select(.state == "free" or (.state == "held" and .criteria != null and .reason == null)))
+              | {number, title}) // null),
+      counts: ($i | group_by(.state) | map({(.[0].state): length}) | add // {})}'
 }
 
 # ---------------------------------------------------------------- writes
