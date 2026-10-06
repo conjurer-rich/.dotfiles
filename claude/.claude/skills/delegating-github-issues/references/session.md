@@ -2,17 +2,18 @@
 
 ## Session title
 
-The chat's name is how the human finds one delegator session among several, in the Claude Code on the web sidebar, the `/resume` picker and the terminal title, so a session names itself after the item it holds. The title changes at these moments, and only when the new title differs from `title` in `run-state.json`:
+The chat's name is how the human finds one delegator session among several, in the Claude Code on the web sidebar, the `/resume` picker and the terminal title, so a session names itself after the last item it worked on. The title stays after the session releases its claim, so a finished PR can still be traced to the session that handled it, and only the next item replaces it. The title changes at these moments, and only when the new title differs from `title` in `run-state.json`:
 
 | Moment | Title |
 |---|---|
 | **Work** step 2, once the claim on issue N wins | `#N <issue title>` |
+| **Work** step 12, once the PR opens | `PR #P (#N) <issue title>` |
 | **Review** step 1, once the claim on PR P wins | `Review PR #P <PR title>` |
 | **Land** step 1, once the claim on PR P wins | `Land PR #P <PR title>` |
 | **Sync** step 1, once the claim on PR P wins | `Sync PR #P <PR title>` |
-| A **Watch** or **Run** pass ends holding no claim | `/delegate watching <owner>/<repo>` |
+| A **Watch** or **Run** pass ends and the session has held no item yet (`title` in `run-state.json` is empty) | `/delegate watching <owner>/<repo>` |
 
-Cut the item's title at a word boundary with `…` so the whole stays within 60 characters. A Work, Review, Land or Sync the human started by hand keeps its item's title when it stops, and so does a run that trips the **Stop rule** or goes to **Blocked**: the title still says where the staged work is. Only a Watch or Run pass sets the watching form, and only at its end.
+Cut the item's title at a word boundary with `…` so the whole stays within 60 characters. A Work, Review, Land or Sync the human started by hand keeps its item's title when it stops, and so does a run that trips the **Stop rule** or goes to **Blocked**: the title still says where the staged work is. Only a Watch or Run pass sets the watching form, only at its end, and only before the session's first item; once a session has worked an item it never goes back to the watching form.
 
 Set it with one call, counted in `tool_calls`, and write the new title to `run-state.json`. A rename that fails is reported in one line of the pass report and never stops a run: the title is a convenience.
 

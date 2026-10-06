@@ -283,11 +283,11 @@ require_text 'Parallelism comes from running several `/loop /delegate` sessions,
 require_text 'One Run pass works at most one issue through to its PR before the loop reschedules' "a Run pass works one issue"
 # F. A run-level stop rule.
 require_text '## Stop rule' "the skill has a Stop rule section"
-require_text 'context use above 60 %, the run has made more than 150 tool calls in the main session, or the same isolation-guard refusal has occurred three times' "the stop rule names its three triggers"
+require_text 'context use above 80 %, the run has made more than 150 tool calls in the main session, or the same isolation-guard refusal has occurred three times' "the stop rule names its three triggers"
 require_text '`run-state.json`' "the stop counters live in run-state.json"
 require_text 'The new session starts a fresh Run, not the stopped Work.' "a stopped run's successor starts fresh"
 # A /loop wakeup is a new turn in the same session, so a run that stopped at
-# 60 % context tripped the rule again on every later pass and the loop died.
+# the context limit tripped the rule again on every later pass and the loop died.
 # A cloud session hands the loop to a new session with an empty context.
 require_text '## Hand-off' "the skill has a Hand-off section"
 require_text 'A skill cannot run `/clear` or `/compact`' "hand-off says why the session cannot clear itself"
@@ -319,11 +319,17 @@ require_text 'the two never mix' "the claims session name and the chat title are
 require_text '| **Work** step 2, once the claim on issue N wins | `#N <issue title>` |' "Work names the chat after the issue"
 require_text '| **Review** step 1, once the claim on PR P wins | `Review PR #P <PR title>` |' "Review names the chat after the PR"
 require_text '| **Land** step 1, once the claim on PR P wins | `Land PR #P <PR title>` |' "Land names the chat after the PR"
-require_text '| A **Watch** or **Run** pass ends holding no claim | `/delegate watching <owner>/<repo>` |' "an idle pass names the chat as watching"
+require_text '| A **Watch** or **Run** pass ends and the session has held no item yet (`title` in `run-state.json` is empty) | `/delegate watching <owner>/<repo>` |' "only a session that has held nothing is named watching"
+# A session renamed itself to the watching form after every pass, so the
+# human could not tell which session had handled which PR. The title now
+# keeps the last item, and Work adds the PR number once the PR opens.
+require_text 'once a session has worked an item it never goes back to the watching form' "a session keeps its last item's title"
+require_text '| **Work** step 12, once the PR opens | `PR #P (#N) <issue title>` |' "Work names the chat after the PR it opened"
+require_text 'and set the **Session title** to `PR #P (#N) <issue title>`.' "Work sets the PR title once the PR opens"
 require_text 'Once the claim is yours, set the **Session title** to `#N <issue title>`.' "Work sets the title once its claim wins"
 require_text 'Once the claim is yours, set the **Session title** to `Review PR #P <PR title>`.' "Review sets the title once its claim wins"
 require_text 'Once the claim is yours, set the **Session title** to `Land PR #P <PR title>`.' "Land sets the title once its claim wins"
-require_text 'so set the **Session title** to its watching form' "Watch and Run set the watching title at the end of a pass"
+require_text 'Set the **Session title** to its watching form only if the session has held no item yet' "Watch and Run set the watching title only before a first item"
 require_text 'and only when the new title differs from `title` in `run-state.json`' "an unchanged title costs no call"
 require_text 'never stops a run: the title is a convenience' "a failed rename never stops a run"
 require_text 'The `set_session_title` tool of the `claude-code-remote` MCP server' "a cloud session renames through the set_session_title tool"
@@ -416,7 +422,7 @@ require_text 'write the id to `ccr-session-id` in the session'"'"'s scratch dire
 require_text 'subscribe each delegated PR once' "Watch subscribes delegated PRs where the tool exists"
 require_text 'Otherwise leave a background poll running between passes' "the CLI keeps the background poll"
 require_text 'with `gh api` REST calls only' "the poll runs over REST"
-require_text 'Subscribe the PR as **Watch** step 6 says.' "Work subscribes the PR it opens"
+require_text 'Subscribe the PR as **Watch** step 6 says' "Work subscribes the PR it opens"
 
 # A delegated PR that fell into a merge conflict sat Idle until the human
 # marked it ready, so Watch now syncs it, resolving only textual conflicts,
