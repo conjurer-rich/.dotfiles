@@ -86,6 +86,8 @@ require_text "$COMMAND" 'Bash(jq:*)' "the CLI rename's jq call needs no permissi
 require_text "$COMMAND" 'mcp__claude-code-remote__set_session_title' "the cloud rename tool needs no permission prompt"
 require_text "$COMMAND" 'mcp__claude-code-remote__subscribe_pr_activity' "subscribing to delegated PRs needs no permission prompt"
 require_text "$COMMAND" 'mcp__claude-code-remote__create_session' "handing the loop to a fresh session needs no permission prompt"
+require_text "$COMMAND" 'mcp__claude-code-remote__send_later' "scheduling the next pass needs no permission prompt"
+require_text "$COMMAND" 'mcp__claude-code-remote__delete_trigger' "cancelling a pending pass needs no permission prompt"
 require_text "$COMMAND" 'because Claude Code on the web blocks GitHub GraphQL' "the command says why writes go through the script"
 # The orchestrator mostly routes once the bookkeeping is a script, so the
 # loop session can run on a cheaper model; the implementer and Land's

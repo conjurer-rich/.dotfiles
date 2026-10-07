@@ -298,6 +298,15 @@ require_text 'call `ScheduleWakeup` with `stop: true`' "the stopped session ends
 require_text 'unsubscribe every PR in `subscribed.json`' "the stopped session stops taking PR events"
 require_text 'Do not archive this session' "the stopped session keeps its staged worktree"
 require_text 'A stop on isolation-guard refusals never hands off' "a guard-refusal stop ends the loop"
+# A ScheduleWakeup timer lives in the container, which is reclaimed while the
+# session idles, so the loop stalled for hours until a PR event or the human
+# woke it. On the web the next pass is a server-side send_later reminder.
+require_text 'call it once with `delay_minutes` 20–30, `message` set to the exact `/loop` command this session was started with' "the web loop schedules its next pass with send_later"
+require_text 'Do not also call `ScheduleWakeup`: two schedulers would fire two passes.' "the web loop never double-schedules"
+require_text 'Otherwise (the CLI), call `ScheduleWakeup`.' "the CLI loop still uses ScheduleWakeup"
+require_text 'that reminder has not fired: cancel it with `delete_trigger`' "every pass cancels the pending reminder first"
+require_text 'Cancel a pending `next_pass_trigger` reminder as **Watch** step 1 does' "a hand-off leaves no pending reminder"
+require_text 'That is why the loop schedules its next pass with `send_later`' "the cloud advice says why the loop uses send_later"
 # Hand-off sessions landed under "Other" in the sidebar: create_session with
 # only source_url records no outcome repository, which the sidebar groups by.
 require_text '`outcome_branch` the branch in `ccr-outcome-branch`' "the next session is grouped under its repository"
