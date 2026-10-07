@@ -305,7 +305,7 @@ require_text 'call it once with `delay_minutes` 20–30, `message` set to the ex
 require_text 'Do not also call `ScheduleWakeup`: two schedulers would fire two passes.' "the web loop never double-schedules"
 require_text 'Otherwise (the CLI), call `ScheduleWakeup`.' "the CLI loop still uses ScheduleWakeup"
 require_text 'that reminder has not fired: cancel it with `delete_trigger`' "every pass cancels the pending reminder first"
-require_text 'When `next_pass_trigger` in `run-state.json` names a pending reminder, cancel it with `delete_trigger`' "a hand-off leaves no pending reminder"
+require_text 'Cancel a pending `next_pass_trigger` reminder as **Watch** step 1 does' "a hand-off leaves no pending reminder"
 require_text 'That is why the loop schedules its next pass with `send_later`' "the cloud advice says why the loop uses send_later"
 # Hand-off sessions landed under "Other" in the sidebar: create_session with
 # only source_url records no outcome repository, which the sidebar groups by.
