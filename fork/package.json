@@ -1,6 +1,6 @@
 {
   "name": "@conjurer-rich/dotfiles",
-  "version": "4.30.2",
+  "version": "4.30.3",
   "private": true,
   "description": "Release line for conjurer-rich/.dotfiles, the fork of citypaul/.dotfiles"
 }
