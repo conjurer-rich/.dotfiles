@@ -1,6 +1,6 @@
 # Run
 
-One unattended pass: **Watch**, then **Pick** and **Work**. Built to run under `/loop`, so that one command keeps delegating until it needs the human. Like Watch, it holds no state between passes beyond its session name. Nobody answers prompts during a Run, so a Run pass never waits on the human: anything that needs an answer stays on GitHub for a later pass.
+One unattended pass: **Watch**, then **Pick** and **Work**. Built to run under `/loop`, so that one command keeps delegating until it needs the human. Like Watch, it holds no state between passes beyond its session name and its pending next pass. Nobody answers prompts during a Run, so a Run pass never waits on the human: anything that needs an answer stays on GitHub for a later pass.
 
 1. **Watch.** Run **Watch** steps 1–4.
 2. **Budget.** Read `budget` from the status Watch ran; if Watch reviewed, landed, synced or reclaimed anything, run `delegate-status status --cache <scratch>/pick-cache.json` again first. If `at_limit` is true, skip Pick without commenting: the paused comment would repeat on every pass. Go to step 4.
