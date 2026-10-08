@@ -39,11 +39,7 @@ jobs:
         id: changesets
         uses: changesets/action@v1
         with:
-          # fork/version.sh runs `changeset version` and then syncs the plugin
-          # manifest in the same commit: Claude Code detects a marketplace update
-          # from plugin.json's version, not from git. It must be one word: the
-          # action execs this input without a shell, so `a && b` does not work.
-          version: bash fork/version.sh
+          version: pnpm changeset version
           commit: 'chore: version packages'
           title: 'chore: version packages'
         env:
@@ -52,8 +48,8 @@ jobs:
       - name: Create Git Tag and GitHub Release
         if: steps.changesets.outputs.hasChangesets == 'false'
         run: |
-          # Get the fork's release version
-          VERSION=$(node -p "require('./fork/package.json').version")
+          # Get the version from package.json
+          VERSION=$(node -p "require('./package.json').version")
           TAG_NAME="v${VERSION}"
 
           # Check if tag already exists

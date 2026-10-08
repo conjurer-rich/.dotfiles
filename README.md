@@ -1,3 +1,12 @@
+> [!IMPORTANT]
+> **This fork is archived.** The `craft` plugin that was published from here
+> now lives in [conjurer-rich/skills](https://github.com/conjurer-rich/skills).
+> Install it with `claude plugin marketplace add conjurer-rich/skills` then
+> `claude plugin install craft@conjurer`. Everything else here matches
+> [citypaul/.dotfiles](https://github.com/citypaul/.dotfiles) at `cd4028d`;
+> [`plans/skills-repo-extraction.md`](plans/skills-repo-extraction.md) records
+> the move.
+
 # Development Guidelines for AI-Assisted Programming
 
 **Comprehensive CLAUDE.md guidelines + specialized agents for Test-Driven Development, TypeScript strict mode, and functional programming. Works with both [Claude Code](https://claude.ai/code) and [OpenCode](https://opencode.ai).**
@@ -1161,7 +1170,7 @@ Ask yourself:
 
 ## 🤖 Claude Code Agents: Automated Enforcement
 
-[**→ Read the agents documentation**](claude/.claude/agent-notes/README.md)
+[**→ Read the agents documentation**](claude/.claude/agents/README.md)
 
 Nine specialized sub-agents that run in isolated context windows to enforce CLAUDE.md principles and manage development workflow:
 
@@ -1409,7 +1418,7 @@ Claude Code: [Launches use-case-data-patterns agent]
 - Only material correctness, authorization, integrity, concurrency, delivery, recovery, or operability gaps
 
 The current agent is an original rewrite. Its
-[source notes](claude/.claude/agent-notes/use-case-data-patterns-source-notes.md)
+[source notes](claude/.claude/agents/references/use-case-data-patterns-source-notes.md)
 disclose an earlier unlicensed copy and the unresolved published-history issue.
 
 ---
@@ -1455,46 +1464,15 @@ Claude Code: [Launches twelve-factor-audit agent, produces compliance report]
 
 [**→ Browse the commands directory**](claude/.claude/commands/)
 
-Four slash commands that encode common workflows into single invocations:
+Three slash commands that encode common workflows into single invocations:
 
 | Command | Purpose | When to Use |
 |---------|---------|-------------|
 | **`/setup`** | Authorized project onboarding — detect tech stack, create project guidance, hooks, and commands | Only when the user explicitly requests onboarding/config generation |
 | **`/plan`** | Create a plan document on a branch with a PR — no code changes | When planning work before implementation |
 | **`/continue`** | Continue after a merged independent PR or advance/sync a stack | Moving to the next slice or dependent layer |
-| **`/delegate`** | Delegate GitHub issues through the `delegating-github-issues` skill: `/loop /delegate` watches delegated PRs, then picks and works the next issue on every pass. Several sessions can run at once; each claims an issue or PR with a comment so the others skip it, and labels it `in-progress` while it holds the claim so the issue list shows what an agent is working on. Each session names its chat after the issue or PR it holds, so the sidebar or `/resume` picker tells them apart | In a project with a `.claude/delegation.md` settings file |
 
 PR review is not a command: the [`panel-review` skill](claude/.claude/skills/panel-review/SKILL.md) provides `/panel-review`, and PR creation is ordinary agent-led work gated by that skill's PR-readiness reference.
-
-#### Unattended `/delegate` runs: permissions
-
-`/delegate` pre-approves its own tools, but a `/loop /delegate` session still stops at a permission prompt when a project's settings ask before `git worktree` commands, and nobody is there to answer. The delegator creates, lists, removes and prunes worktrees from the main checkout, so allow those four in the project's `.claude/settings.json`:
-
-```json
-{
-  "permissions": {
-    "allow": [
-      "Bash(git worktree list:*)",
-      "Bash(git worktree add:*)",
-      "Bash(git worktree remove:*)",
-      "Bash(git worktree prune:*)"
-    ]
-  }
-}
-```
-
-`git worktree remove` takes `--force` only for a merged worktree whose sole leftovers are agent scratch (`AGENTS.md`, untracked files under `.claude/`), which `delegate-status` checks first. The delegator also commits and pushes from the main checkout with `git -C <worktree> commit` and `git -C <worktree> push`; a project that narrows `Bash(git:*)` allows those two as well.
-
-Settings a project can add to `.claude/delegation.md` to keep delegated runs cheap, each optional:
-
-| Setting | Effect |
-|---|---|
-| `tier_small_max_lines`, `tier_small_max_packages`, `risk_paths` | A diff under the limits that touches no risk path is tier S: no plan document and one self-review instead of a review panel |
-| `full_suite_paths` | Paths whose change makes the implementer run the complete suite locally |
-| **Verification scope** section | Replaces the `/pr` gate's complete-suite rule with the project's own scope |
-| `preflight:` line | Drift fixers run before a PR's first push, in order |
-
-A project that sets none of them keeps the skill's defaults. Every delegated PR body ends with a `Delegation cost:` line, and `delegate-status cost --repo <owner>/<repo> --limit 10` sums it across recent merged delegated PRs.
 
 ### Recommended Flow
 
@@ -1686,7 +1664,7 @@ those reviewed names without unrelated skills or files blocking the install.
   - [coreyhaines31/marketingskills/seo-audit](https://skills.sh/coreyhaines31/marketingskills/seo-audit) — technical, on-page, content, and authority SEO audit workflow
   - [herdrdev/herdr](https://skills.sh/herdrdev/herdr) — drive the [Herdr](https://herdr.dev) terminal workspace from inside an agent: split panes, run commands, read output, wait on a sibling agent
   - [warpdotdev/common-skills/skill-doctor](https://www.warp.dev/skill-doctor) — score recent local agent conversations and draft evidence-backed skill improvements; transcripts stay local and reports are written to a temporary directory
-- ✅ `~/.claude/commands/` (4 slash commands: /setup, /plan, /continue, /delegate)
+- ✅ `~/.claude/commands/` (3 slash commands: /setup, /plan, /continue)
 - ✅ `~/.claude/agents/` (9 specialized workflow agents)
 
 **Inspecting skills after install:**
@@ -1913,7 +1891,7 @@ change before release.
 - **[Skills](claude/.claude/skills/)** - Auto-discovered patterns from this repo plus pinned external skills, including `clarity`, `simple-english`, web quality, Next.js, React, design, planning, skill-authoring, SEO, Herdr, and Skill Doctor workflows — all installed via [skills.sh](https://skills.sh) for multi-agent portability.
 - **[Commands](claude/.claude/commands/)** - Slash commands (/setup, /plan, /continue)
 - **[Skill evaluations](evals/skills/README.md)** - promptfoo routing suite that checks each skill fires on the requests it claims and stays quiet on its neighbours'
-- **[Agents README](claude/.claude/agent-notes/README.md)** - Detailed agent documentation with examples
+- **[Agents README](claude/.claude/agents/README.md)** - Detailed agent documentation with examples
 - **[Agent Definitions](claude/.claude/agents/)** - Individual agent configuration files (9 agents: tdd-guardian, ts-enforcer, refactor-scan, docs-guardian, learn, progress-guardian, adr, use-case-data-patterns, twelve-factor-audit)
 
 ---
