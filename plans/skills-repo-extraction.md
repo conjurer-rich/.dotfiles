@@ -1,6 +1,6 @@
 # Spec: move the craft skills into their own repository
 
-Status: proposal — nothing here is built yet. D1, D5 and D9–D11 are decided.
+Status: proposal — nothing here is built yet. D1, D5 and D9–D11 are decided; D12 is proposed.
 Still open: the copyright holder name (D11, before Phase 1) and what
 `.dotfiles` becomes (Phase 5).
 
@@ -465,6 +465,93 @@ subfolders.
     "adopt" or "adapt" suggestion, and rule 3 is part of done for any PR that
     acts on one.
 
+### D12. Delegation without lock-in: a Ralph runner beside `/loop` (proposed)
+
+**How `/loop /delegate` works today.** `/loop` is built into Claude Code, and
+it keeps running passes **in the same session and context window**. The
+delegation skill also relies on other Claude Code features:
+
+- `ScheduleWakeup` (CLI), plus `send_later`, `create_session`,
+  `subscribe_pr_activity`, `get_session` and `set_session_title` (Claude Code
+  on the web);
+- the Agent tool, for the implementer and reviewer subagents;
+- the built-in `/code-review` and `/simplify`;
+- `model: opus` pins.
+
+The **Stop rule** (80 % context or 150 tool calls) and **Hand-off**
+(`create_session` into a fresh session) exist only because `/loop` reuses one
+context.
+
+**What is already neutral.** All state lives on GitHub: claims, the
+`in-progress` label, PRs and markers. `delegate-status` is plain bash over
+`gh api` REST. A Run pass "holds no state between passes beyond its session
+name and pending next pass". That is the precondition for a Ralph loop.
+
+**The Ralph loop** (Geoffrey Huntley's technique): a shell loop that starts a
+headless agent CLI with the same prompt over and over. Every iteration is a
+new process with an empty context, and state lives on disk and in git. It
+needs no harness features, so the CLI is swappable.
+
+**Proposal:** keep `/loop /delegate` for Claude Code, where it works today and
+is the only option inside a web session. Add `scripts/delegate-loop`, a
+harness-neutral outer loop:
+
+```sh
+AGENT=codex scripts/delegate-loop            # or claude | opencode
+```
+
+```text
+loop:
+  status = delegate-status status          # bash + gh, costs no tokens
+  if nothing to watch, land or pick:       # most passes end here
+    sleep $IDLE (e.g. 15 min); continue
+  run one pass with a fresh context:
+    claude -p   "$(cat prompts/delegate-run.md)"   |
+    codex exec  "$(cat prompts/delegate-run.md)"   |
+    opencode run "$(cat prompts/delegate-run.md)"
+  stop on: a STOP file, N consecutive failures, or a daily pass/cost budget
+```
+
+What this buys:
+
+- **No lock-in.** The same skill runs under Claude Code, Codex or OpenCode.
+  OpenCode can drive many providers, including local models, so the
+  fallback when prices rise is a config change, not a rewrite.
+- **Cheaper idle time.** Today every `/loop` pass spends model tokens just to
+  find out that there is nothing to do. The runner asks `delegate-status`
+  first and spends tokens only when there is work.
+- **Fresh context every pass.** Under the runner the Stop rule rarely trips,
+  and Hand-off becomes unnecessary.
+- **Mix models by role.** The routing pass can run on a cheap model while
+  the implementer runs on a strong one, set per harness in
+  `.claude/delegation.md` (`implementer_model`, `review_model`), not pinned
+  in the skill.
+
+Where it runs: any always-on machine (your Windows box under WSL or Git Bash,
+a small VM) or a scheduled CI job. A cloud Claude Code session cannot host it,
+because its container is reclaimed when idle. Headless runs may bill by API
+usage rather than a subscription, depending on the CLI and plan. The runner
+reports usage per pass so the cost is visible.
+
+**What the skill must change to support it** (Phase 7):
+
+1. **Harness capabilities become optional.** Scheduling, PR subscriptions,
+   session titles and Hand-off are each used "where the harness provides
+   it". Under the runner they are skipped, because the runner does the
+   scheduling.
+2. **Subagents by capability.** Implementer and reviewers are "a subagent
+   with a fresh context". In Claude Code that is the Agent tool, in Codex its
+   configured agents, and under the runner, if the harness has neither, a
+   nested `codex exec` / `claude -p` call per role.
+3. **Review steps go through `craft:review` (D9)** plus a configurable
+   `correctness_review` command (`/code-review`, `codex review`, or none),
+   instead of naming Claude's built-ins. The same applies to `/simplify`.
+4. **`/delegate` becomes a user-invoked skill** (`$delegate` in Codex), with
+   `prompts/delegate-run.md` as the runner's prompt. Permissions move from
+   Claude's `allowed-tools` to the runner's sandbox and approval flags per CLI.
+5. **The Stop rule stays** as a safety net, but under the runner it ends the
+   pass and lets the next iteration start fresh.
+
 ## Plan
 
 Each phase ends in a working state; nothing breaks the current install until
@@ -575,6 +662,30 @@ Done when Codex installs craft from the marketplace on a clean machine, the
 portable skills appear and run, `craft:review` produces both axes, and
 `craft:ask` marks every claude-only item.
 
+### Phase 7 — harness-neutral delegation
+
+After Phase 6. It follows D12.
+
+- Make the four harness-specific capability groups in
+  `delegating-github-issues` optional (D12 change 1), keeping today's
+  behaviour under `/loop` in Claude Code. The `delegate-command` and
+  `delegation-landing-workflow` tests keep passing.
+- Add `delegate-status next-action`, which prints `idle | watch | land | pick`
+  plus a reason, as the runner's zero-token gate.
+- Write `scripts/delegate-loop` and `prompts/delegate-run.md`, with
+  `AGENT=claude|codex|opencode`, an idle sleep, a STOP file, a failure limit
+  and a daily pass budget. Test it against a stubbed agent CLI: idle sleeps
+  without calling the agent, work calls it once, STOP and the failure limit
+  exit cleanly.
+- Move the model pins into `.claude/delegation.md` parameters.
+- Dry run: one issue end to end in a scratch repository with
+  `AGENT=codex`, then with `AGENT=claude`. Compare tokens and wall-clock time
+  with `/loop /delegate` on the same issue, and record the results in the PR.
+
+Done when the same labelled issue goes from Pick to an open PR under both
+CLIs through `scripts/delegate-loop`, and `/loop /delegate` still works
+unchanged in Claude Code.
+
 ## Risks
 
 | Risk | Mitigation |
@@ -588,6 +699,8 @@ portable skills appear and run, `craft:review` produces both axes, and
 | A licence notice is lost in the move or on a later adoption | D11's CI checks; nested notices are copied, never rewritten. |
 | `review` is shadowed by a harness built-in (Claude Code once shipped `/review`; Codex has `/review`) | In Claude Code it is namespaced as `craft:review`, and in Codex it is called with `$review`, not `/review`. If either harness still shadows it, rename it to `two-axis-review`. |
 | A "portable" skill quietly picks up Claude-only wording | The Phase 6 CI check, and `$`-invocation smoke tests in Codex. |
+| A runner left alone spends money on a loop of failures | The failure limit, daily pass budget, STOP file and per-pass usage log (Phase 7). |
+| The headless CLIs change their flags | The runner keeps one small adapter function per CLI, with a stubbed-CLI test. |
 | Licensing drift when adopting from upstream | Keep the existing provenance pattern; the routine's issue template asks for the license check. |
 
 ## Appendix: triage proposal (Windows machine, 2026-10-08)
