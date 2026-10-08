@@ -67,7 +67,7 @@ Every turn re-reads the whole context, so sessions stay short, and a session wor
 - **Hand-off threshold**: context use above 50 %, more than 80 tool calls in the main session, or a finished Work. Finish the current item to its next checkpoint (PR opened or pushed, claim released), then stop and hand off.
 - **Hard stop**: context use above 80 %, more than 150 tool calls, or the same isolation-guard refusal three times. Stop at once; staged work stays in the worktree.
 
-Either way, follow `references/handoff.md`. The counters live in `run-state.json`.
+Either way, follow `references/handoff.md`. It then follows **Hand-off**, under `/loop` or not. The counters live in `run-state.json`.
 
 ## Entry points
 
