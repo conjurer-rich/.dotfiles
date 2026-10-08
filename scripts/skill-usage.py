@@ -16,6 +16,11 @@ What counts as a use:
 install-rich.sh into ~/.claude/skills has no prefix. A name with any other
 prefix (another plugin's `tdd`) does not.
 
+Claude Code deletes transcripts after `cleanupPeriodDays` (30 by default), so
+a 90-day window usually covers about 30 days; the report says how far back the
+oldest transcript reaches. Raise cleanupPeriodDays in settings.json to keep
+more history for a later re-run.
+
 Transcripts live on the machine that ran the session. Run this on each
 machine you use, or copy their projects directories together and pass each
 with --projects. Cloud sessions keep no transcripts after the container goes.
@@ -24,6 +29,7 @@ Usage:
   scripts/skill-usage.py                       # Markdown table, last 90 days
   scripts/skill-usage.py --days 60 --format json
   scripts/skill-usage.py --projects ~/.claude/projects --projects ./laptop-projects
+  py scripts\\skill-usage.py --output usage.md   # Windows: avoids PowerShell's UTF-16 `>`
 """
 
 import argparse
@@ -126,6 +132,7 @@ def events(line):
 def scan(project_dirs, since):
     uses = {}  # (kind, raw name) -> list of (session, time)
     files = 0
+    earliest = None
     for root in project_dirs:
         if not root.is_dir():
             print(f"skill-usage: no transcripts at {root}", file=sys.stderr)
@@ -143,10 +150,12 @@ def scan(project_dirs, since):
                     when = parse_time(line.get("timestamp"))
                     if when is not None and when < since:
                         continue
+                    if when is not None and (earliest is None or when < earliest):
+                        earliest = when
                     session = line.get("sessionId") or path.stem
                     for kind, name in events(line):
                         uses.setdefault((kind, name), []).append((session, when))
-    return uses, files
+    return uses, files, earliest
 
 
 def report(plugin_root, project_dirs, days):
@@ -155,7 +164,7 @@ def report(plugin_root, project_dirs, days):
     items = inventory(plugin_root)
     sources = {i["name"]: i["text"] for i in items}
     sources.update(guidance_texts(plugin_root))
-    uses, files = scan(project_dirs, since)
+    uses, files, earliest = scan(project_dirs, since)
 
     def matches(item):
         kinds = {"skill": ("skill", "slash"), "agent": ("agent",), "command": ("slash",)}[item["kind"]]
@@ -203,6 +212,7 @@ def report(plugin_root, project_dirs, days):
         "projects": [str(p) for p in project_dirs],
         "plugin_root": str(plugin_root),
         "files": files,
+        "earliest": earliest.date().isoformat() if earliest else None,
         "items": rows,
         "other": dict(sorted(other.items(), key=lambda kv: (-kv[1], kv[0]))),
     }
@@ -212,7 +222,8 @@ def markdown(r):
     out = [
         f"# craft usage, last {r['days']} days (since {r['since']})",
         "",
-        f"{r['files']} transcript files under {', '.join(r['projects'])}.",
+        f"{r['files']} transcript files under {', '.join(r['projects'])}; "
+        f"the oldest record in the window is from {r['earliest'] or 'nowhere'}.",
         "`suggest`: own = used; review = unused, but a used craft item routes to it; drop? = neither.",
         "",
         "| kind | name | uses | sessions | last used | routed by | suggest |",
@@ -239,10 +250,15 @@ def main(argv=None):
     parser.add_argument("--plugin-root", type=Path, default=DEFAULT_PLUGIN_ROOT,
                         help="the craft plugin directory (default claude/.claude in this repo)")
     parser.add_argument("--format", choices=("md", "json"), default="md")
+    parser.add_argument("--output", type=Path, help="write the report here, as UTF-8, instead of stdout")
     args = parser.parse_args(argv)
 
     result = report(args.plugin_root, args.projects or default_projects(), args.days)
-    print(json.dumps(result, indent=2) if args.format == "json" else markdown(result))
+    text = json.dumps(result, indent=2) if args.format == "json" else markdown(result)
+    if args.output:
+        args.output.write_text(text + "\n", encoding="utf-8")
+    else:
+        print(text)
 
 
 if __name__ == "__main__":

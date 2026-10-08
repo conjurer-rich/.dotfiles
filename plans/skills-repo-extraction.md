@@ -416,3 +416,72 @@ items.
 | `engineering-practice` is skipped on a coding task | The global `CLAUDE.md` / `AGENTS.md` tells every session to load it; Phase 2 checks it fires in a fresh session. |
 | A machine has the plugin but not the global file (cloud sessions) | The skill description still says "load first in any coding task"; for Claude Code on the web, add the same line to the environment's setup or the project's own `CLAUDE.md`. |
 | Licensing drift when adopting from upstream | Keep the existing provenance pattern; the routine's issue template asks for the license check. |
+
+## Appendix: triage proposal (Windows machine, 2026-10-08)
+
+Source: `scripts/skill-usage.py` on the Windows machine, 500 transcript files.
+Claude Code keeps transcripts for 30 days by default, so this is roughly one
+month of use (oldest "last used" is 2026-09-07). "Leaned on by" counts
+references from the **used** items only.
+
+### Own: used (25 skills, 1 agent, 1 command)
+
+`tdd` 43 · `testing` 28 · `delegating-github-issues` 22 ·
+`browser-ux-walkthrough` 18 · `acceptance-review` 14 · `refactoring` 8 ·
+`react-testing` 6 · `find-gaps` 5 · `ubiquitous-language` 5 · `planning` 4 ·
+`stack-pull-requests` 4 · `story-splitting` 4 · `typescript-strict` 4 ·
+`characterisation-tests` 3 · `ci-debugging` 2 · `event-sourcing` 2 ·
+`mutation-testing` 2 · `reduce-system-complexity` 2 · `debugging` 1 ·
+`hexagonal-architecture` 1 · `secure-oauth-oidc` 1 · `specification` 1 ·
+`storyboard` 1 · `technical-writing` 1 · `twelve-factor` 1 ·
+agent `tdd-guardian` 37 · command `/delegate` 16.
+
+Plus `engineering-practice`: never invoked because the local `CLAUDE.md`
+already supplies it, but it is where `CLAUDE.md` folds into (D5).
+
+### Own: a used item depends on it
+
+| Item | Leaned on by |
+| --- | --- |
+| `finding-seams` | characterisation-tests ×5, testing, stack-pull-requests, reduce-system-complexity, debugging, hexagonal-architecture |
+| `structure-codebase` | hexagonal-architecture ×7, ubiquitous-language, reduce-system-complexity |
+| `front-end-testing` | react-testing ×6, testing |
+| `domain-driven-design` | hexagonal-architecture ×3, ubiquitous-language ×2, event-sourcing ×2 |
+| `functional` | typescript-strict ×2, event-sourcing ×2, reduce-system-complexity ×2, twelve-factor |
+| `observability` | hexagonal-architecture ×4, ci-debugging, debugging, twelve-factor |
+| `codebase-design` | reduce-system-complexity ×2, refactoring, hexagonal-architecture |
+| `evaluate-existing-solutions` | reduce-system-complexity ×2, planning, specification |
+| `expectations` | planning ×2, storyboard, technical-writing |
+| `bff-entry-points` | hexagonal-architecture, secure-oauth-oidc |
+| `test-design-reviewer` | testing |
+| `double-check` | acceptance-review |
+| agent `refactor-scan` | tdd-guardian ×2 |
+
+### Your call: thin dependency
+
+| Item | Leaned on by | Recommendation |
+| --- | --- | --- |
+| `panel-review` (+ `graph-engineering`, which it is built on) | tdd ×2, planning, tdd-guardian | Drop both and repoint those lines at `/code-review` (26 uses) and the project `pr-reviewer` agent (19), which is what you actually use. |
+| `improve-codebase-architecture` | refactoring, reduce-system-complexity | Keep; it is already an adaptation of Matt's, so the watch routine tracks it. |
+| `xstate`, `react-performance` | react-testing | Keep if React work continues. |
+| `api-design`, `cli-design`, `diagrams` | technical-writing ×1 each | Keep `api-design`; drop the other two. |
+| agents `adr`, `learn` | planning | Drop; repoint planning at `expectations`. |
+| commands `/plan`, `/continue` | planning | Drop unless you type them. |
+
+### Drop: nothing used depends on it
+
+`folder-structure` (deprecated alias), `find-skills`, `teach-me`,
+`render-code-shape`, `production-parity-skill-builder`, `bff-design`, `wtf`,
+command `/setup`, agents `docs-guardian`, `progress-guardian`, `ts-enforcer`,
+`twelve-factor-audit`, `use-case-data-patterns`. References to them from kept
+items are removed during import; the D8 link check confirms none are left.
+
+### Used, but not part of craft: candidates to adopt or watch
+
+- `grill-me` (Matt) ×8: adopt into the plugin, with provenance.
+- `superpowers:*` (brainstorming ×11, writing/executing plans, git worktrees,
+  systematic debugging): overlaps `planning`, `specification` and `debugging`.
+  Consider adding `obra/superpowers` to `upstream/sources.json`.
+- `code-review` ×26, `simplify` ×14: built into Claude Code; nothing to move.
+- `flow-canvas-*`, `pr-reviewer`, `steward`, `pre-commit`: project-local; they
+  stay in their projects.

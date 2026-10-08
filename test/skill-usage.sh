@@ -109,6 +109,16 @@ else
   fail "the default Markdown table lists zero-use items"
 fi
 
+check "the earliest record in the window is reported" "r['earliest'] is not None and r['earliest'] != '2020-01-01'"
+
+python3 "$USAGE" --projects "$projects" --plugin-root "$plugin" --output "$work/out.md"
+if python3 -c "import sys; open(sys.argv[1], encoding='utf-8', errors='strict').read()" "$work/out.md" \
+  && grep -q '^| skill | tdd | 3 |' "$work/out.md"; then
+  pass "--output writes the report as UTF-8"
+else
+  fail "--output writes the report as UTF-8"
+fi
+
 if [ "$FAILURES" -gt 0 ]; then
   echo -e "${RED}$FAILURES skill-usage check(s) failed${NC}"
   exit 1
