@@ -100,7 +100,14 @@ upstream/
 test/                   # skill-only tests, paths rewritten
 evals/skills/           # promptfoo suites
 .changeset/  package.json  CHANGELOG.md
+global/
+  CLAUDE.md             # thin global instructions (D5)
+  AGENTS.md -> CLAUDE.md
+scripts/
+  skill-usage.py        # usage count for triage (D4)
+  install-global        # links global/ into ~/.claude, ~/.codex, ~/.config/opencode
 CLAUDE.md               # how to work on THIS repository
+AGENTS.md -> CLAUDE.md
 README.md  LICENSE  PROVENANCE.md
 ```
 
@@ -133,9 +140,24 @@ Triage every item into one of:
 Use evidence, not memory, for "in use": count `Skill` tool calls and
 `craft:` references in local Claude Code transcripts
 (`~/.claude/projects/**/*.jsonl`) over the last 60–90 days, plus anything
-another skill or command routes to. A small script in the new repository
-(`scripts/skill-usage`) produces the table; the triage result goes in the
-import PR description.
+another skill or command routes to. `scripts/skill-usage.py` (in this repository
+now, moving with the skills) produces the table:
+
+```sh
+scripts/skill-usage.py                  # Markdown, last 90 days, ~/.claude/projects
+scripts/skill-usage.py --days 60 --format json
+scripts/skill-usage.py --projects ~/.claude/projects --projects ~/other-mac-projects
+```
+
+It counts `Skill` tool calls, `Agent` spawns and slash commands, for both
+`craft:<name>` and bare `<name>` (skills installed by `install-rich.sh` have no
+prefix), and suggests **own** (used), **review** (unused, but a used item
+routes to it) or **drop?** (neither). Routing from `CLAUDE.md` alone does not
+count, since that file is being rewritten. A "Used, but not part of craft"
+section lists other skills and agents you call, which is where **Replace**
+candidates show up. Transcripts are per machine and cloud sessions keep none,
+so run it on each machine you work on. The triage result goes in the import PR
+description.
 
 Known starting points:
 
@@ -170,14 +192,63 @@ the pointer all go.
   Lines for skills that are dropped or not installed (for example `pre-commit`,
   `quality`, `scaffold-new-project`) are removed, and the CI link check (D8)
   keeps it honest.
-- `CLAUDE.rich.md`'s "Global preferences" (visual companion consent, skills
-  live globally) move into `SKILL.md` as their own short section.
-- The skill description keeps "load this first in any coding task", since
-  that description is now the only thing that triggers it.
+- The skill description keeps "load this first in any coding task".
 
-The installer no longer writes `~/.claude/CLAUDE.md` or `base-CLAUDE.md`. Any
-existing copies are deleted at cut-over (Phase 4), so the guidelines are not
-loaded twice from two diverging sources.
+**A thin global `CLAUDE.md`, with `AGENTS.md` pointing at it (decided).** The
+guidelines live in the skill, but a short global file makes sure every session
+loads it, and carries the personal preferences that are not engineering policy.
+It is the same file for every agent: `AGENTS.md` is a symlink to `CLAUDE.md`,
+as in Matt's repository, so Codex, OpenCode and other `AGENTS.md` readers get
+the same pointer.
+
+```
+global/
+  CLAUDE.md             # the thin global file (draft below)
+  AGENTS.md -> CLAUDE.md
+```
+
+Draft `global/CLAUDE.md`, written agent-neutrally so it reads correctly as
+`AGENTS.md` too:
+
+```md
+# Global instructions
+
+Before any coding task, load the `engineering-practice` skill
+(`craft:engineering-practice` in Claude Code). It holds the engineering
+guidelines and the routing table for every other skill; this file does not
+repeat them.
+
+## Personal preferences
+
+- Visual companion: always allowed. When a design workflow could use the
+  browser-based visual companion, use it without asking each time.
+- Skills live globally. A project vendors a skill into its own
+  `.claude/skills/` only when the skill is genuinely project-specific.
+```
+
+`CLAUDE.rich.md`'s "Global preferences" move here, not into the skill.
+
+`scripts/install-global` links them into place from a clone of the
+repository, so a `git pull` updates them:
+
+| Link | Target |
+| --- | --- |
+| `~/.claude/CLAUDE.md` | `<clone>/global/CLAUDE.md` |
+| `~/.codex/AGENTS.md` | `<clone>/global/AGENTS.md` |
+| `~/.config/opencode/AGENTS.md` | `<clone>/global/AGENTS.md` |
+
+It backs up an existing file before replacing it, skips an agent whose config
+directory does not exist, and copies instead of linking where symlinks are
+unavailable (Git Bash on Windows without developer mode). A plugin install
+cannot write these files, which is why this is a separate script.
+
+The repository's own root follows the same pattern: `CLAUDE.md` says how to
+work on the repository (buckets, `plugin.json` list, changesets, tests) and
+`AGENTS.md -> CLAUDE.md`.
+
+`base-CLAUDE.md` and the overlay go: at cut-over (Phase 4) the old
+`~/.claude/CLAUDE.md` and `~/.claude/base-CLAUDE.md` are backed up and replaced
+by the link, so the guidelines are not loaded from two diverging sources.
 
 ### D6. Upstream watch: a weekly Claude Code Routine that files one issue
 
@@ -270,7 +341,8 @@ Phase 4.
 ### Phase 0 — decide (this PR)
 
 - ~~Answer the repository-name and `CLAUDE.md` decisions~~ — done (D1, D5).
-- Run the usage count (D4) locally and fill in the triage table.
+- Run the usage count (D4) locally and fill in the triage table:
+  `scripts/skill-usage.py` in this repository (see below).
 
 ### Phase 1 — create the repository and import
 
@@ -292,8 +364,12 @@ items.
 ### Phase 2 — fold `CLAUDE.md`
 
 - Rewrite `engineering-practice` as D5 describes: policy in `SKILL.md`,
-  merged routing table in `references/routing.md`, global preferences as
-  their own section; drop the `${CLAUDE_PLUGIN_ROOT}/CLAUDE.md` pointer.
+  merged routing table in `references/routing.md`; drop the
+  `${CLAUDE_PLUGIN_ROOT}/CLAUDE.md` pointer.
+- Add `global/CLAUDE.md`, the `global/AGENTS.md` symlink and
+  `scripts/install-global` (with a test that runs it against a temporary
+  home: links made, existing file backed up, missing agent skipped).
+- Add the repository's root `CLAUDE.md` and `AGENTS.md -> CLAUDE.md`.
 - Prune routing lines for dropped or uninstalled skills; the link check
   passes.
 - Check in a fresh session that a coding prompt loads
@@ -315,8 +391,9 @@ items.
   that uses it.
 - Update any `extraKnownMarketplaces` / `enabledPlugins` settings that name
   `conjurer-dotfiles`.
-- Delete `~/.claude/CLAUDE.md` and `~/.claude/base-CLAUDE.md` (back them up
-  first) so only `engineering-practice` supplies the guidelines.
+- Run `scripts/install-global` from a clone: it backs up and replaces
+  `~/.claude/CLAUDE.md` and links `AGENTS.md` for Codex and OpenCode. Delete
+  `~/.claude/base-CLAUDE.md`.
 
 ### Phase 5 — retire the fork's plugin
 
@@ -336,5 +413,6 @@ items.
 | Stop hook behaves differently as a plugin hook (`$HOME/.claude/hooks/…` path) | Use `${CLAUDE_PLUGIN_ROOT}` in `hooks.json`; keep the delegator-exemption test. |
 | Two plugins installed at once during cut-over → duplicate skills | Uninstall the old one before installing the new one (Phase 4 order). |
 | Watch issues become noise | Silent when nothing changed; one issue per run; drop a source from `sources.json` when it stops being useful. |
-| With no global `CLAUDE.md`, `engineering-practice` is skipped on a coding task | Its description says "load first in any coding task"; Phase 2 checks it fires. If it doesn't, add a one-line `~/.claude/CLAUDE.md` that names the skill. |
+| `engineering-practice` is skipped on a coding task | The global `CLAUDE.md` / `AGENTS.md` tells every session to load it; Phase 2 checks it fires in a fresh session. |
+| A machine has the plugin but not the global file (cloud sessions) | The skill description still says "load first in any coding task"; for Claude Code on the web, add the same line to the environment's setup or the project's own `CLAUDE.md`. |
 | Licensing drift when adopting from upstream | Keep the existing provenance pattern; the routine's issue template asks for the license check. |
