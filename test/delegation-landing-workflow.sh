@@ -298,6 +298,10 @@ require_text 'call `ScheduleWakeup` with `stop: true`' "the stopped session ends
 require_text 'unsubscribe every PR in `subscribed.json`' "the stopped session stops taking PR events"
 require_text 'Do not archive this session' "the stopped session keeps its staged worktree"
 require_text 'A stop on isolation-guard refusals never hands off' "a guard-refusal stop ends the loop"
+# Only a /loop run handed off, so a /delegate #<n> that hit the context or
+# tool-call limit stopped and waited for the human to start a new session.
+require_text 'It then follows **Hand-off**, under `/loop` or not' "every stopped run hands off, not only a loop"
+require_text 'or, for a run started by hand, the exact `/delegate` command with its arguments' "a hand-started run's successor runs the same command"
 # A ScheduleWakeup timer lives in the container, which is reclaimed while the
 # session idles, so the loop stalled for hours until a PR event or the human
 # woke it. On the web the next pass is a server-side send_later reminder.
@@ -316,6 +320,9 @@ require_text 'write its first outcome branch to `ccr-outcome-branch`' "the outco
 require_text '| **Hand-off** step 3, once the next session starts | `[handed off → <id>] <title>` |' "a handed-off session says so in its title"
 require_text '| **Hand-off** ends the loop without a next session | `[loop ended] <title>` |' "an ended loop says so in its title"
 require_text 'the last 8 characters of the new session'"'"'s id' "the title names the session it handed off to"
+# The report named the new session only by id, so the human had to find it in
+# the sidebar; it now links to the session.
+require_text 'plus the new session as a clickable link, `[<id>](https://claude.ai/code/<session id>)`' "the hand-off report links to the new session"
 # G. Cloud container guidance.
 require_text '## Running in a cloud container' "the skill has cloud container guidance"
 require_text 'only the GitHub connector attached' "the guidance names the connector cost"
