@@ -84,7 +84,7 @@ named `.dotfiles` commit, and record that SHA in `PROVENANCE.md`.
 skills/
   engineering/          # tdd, testing, refactoring, codebase-design, …
   architecture/         # hexagonal, ddd, event-sourcing, bff-*, api-design, …
-  delivery/             # delegating-github-issues, planning, stack-pull-requests, panel-review, …
+  delivery/             # delegating-github-issues, planning, stack-pull-requests, review, …
   writing/              # technical-writing, diagrams, expectations, wtf, …
   in-progress/          # drafts: in the repo, NOT listed in plugin.json
   shelf/                # kept but not shipped; craft:ask can point at them
@@ -336,6 +336,67 @@ Carry over only skill-related checks, with paths rewritten from
 Left behind: `setup-dotfiles.py`, `opencode-compat.sh`, the
 `install-claude-*` tests and the macOS/Debian install matrix.
 
+### D9. `craft:review`: a portable two-axis review (decided)
+
+Claude Code's built-in `/code-review` finds correctness bugs, but it exists
+only in Claude Code. Codex has its own `/review` (and `codex review`), and
+neither one knows your standards or the issue the change was for.
+`craft:review` covers what both built-ins miss, and works the same in either:
+
+| Axis | Checks | Source |
+| --- | --- | --- |
+| **Standards** | Does the diff follow the repository's written standards, and the craft skills that apply to it? | `CLAUDE.md` / `AGENTS.md`, `CODING_STANDARDS.md`, `CONTRIBUTING.md`; up to three craft skills picked from the diff's traits (`typescript-strict` for `.ts`, `testing` for test files, `hexagonal-architecture` when the repository has opted in, …); Matt's Fowler smell baseline as the fallback. A documented repo standard always overrides a smell. |
+| **Spec** | Does the diff do what the issue asked, no more and no less? | Runs `acceptance-review` against the issue named in the commits or branch, or a path you pass. It is skipped, and the report says so, when there is no spec. |
+
+- **Not a correctness reviewer.** It leaves bugs to the host's own reviewer:
+  `/code-review` in Claude Code, `/review` in Codex. `craft:ask` says to run
+  both.
+- **Shape.** It is adapted from Matt's `code-review`: pin a fixed point (by
+  default the merge-base with the default branch), then run the two axes as
+  separate subagents where the harness has them, or one after the other where
+  it does not. The two reports are presented side by side and never merged
+  or re-ranked, so a pass on one axis cannot hide a failure on the other.
+- **Invocation.** It is user-invoked and model-invoked: `/craft:review [ref]`
+  in Claude Code, `$review [ref]` in Codex.
+- **Where it plugs in.** It replaces `panel-review` wherever `tdd`, `planning`
+  and `tdd-guardian` point at it today. `/delegate` keeps its own pipeline
+  (`tdd-guardian`, `acceptance-review`, `/code-review`), which already
+  covers the same ground.
+- **Provenance.** Matt's MIT licence and pinned commit go in
+  `review/references/source-notes.md`, as for the other adapted skills.
+
+### D10. Portability: Claude Code and Codex (decided)
+
+craft targets Claude Code first, but everything that can run in Codex should.
+Codex reads the same `SKILL.md` format, loads skills on demand, reads
+`AGENTS.md` (D5) and installs plugins. Matt ships his repository to Codex with
+`codex plugin marketplace add mattpocock/skills`, using his `.claude-plugin/`
+manifests plus an `agents/openai.yaml` per skill. Each shipped item gets one of
+three tiers:
+
+| Tier | Meaning | Examples |
+| --- | --- | --- |
+| **portable** | Plain instructions; it works in either harness. | `tdd`, `testing`, `refactoring`, `find-gaps`, `specification`, `story-splitting`, `ubiquitous-language`, `technical-writing`, `grilling` / `grill-me`, `teach`, `writing-for-agents`, `ask` |
+| **degrades** | It uses subagents, which it runs in parallel where the harness has them and one after another where it does not. | `review`, `acceptance-review`, `double-check`, `improve-codebase-architecture`, `retro` |
+| **claude-only** | It depends on Claude Code tools (Workflow, `send_later`, `create_session`, `/code-review`), Claude agent files or hooks. | `delegating-github-issues`, `/delegate`, `browser-ux-walkthrough`, the Stop hook, `agents/*.md` |
+
+Rules for every skill written or adapted from Phase 1 on:
+
+- **Name capabilities, not tools.** Write "spawn a subagent", not "use the
+  Agent tool". Where a Claude Code tool is the only way, put it in a note
+  labelled "Claude Code:", with what to do elsewhere. Matt's `codebase-design`
+  has an open issue (#564) because its "Agent tool" wording does not port.
+- **No harness paths.** Skills do not name `~/.claude/...`. They refer to
+  their own folder relatively, and to global instructions as "your global
+  `CLAUDE.md` / `AGENTS.md`".
+- **Don't rely on temp files across sessions.** Codex clears its temp
+  directory between sessions, so anything handed over goes in the repository
+  or the project's scratch directory.
+- **Invocation is written both ways** where it matters: `/craft:name` in
+  Claude Code and `$name` in Codex.
+- **The tier is declared in `craft:ask`**, so the router never sends you to a
+  claude-only skill in Codex.
+
 ## Plan
 
 Each phase ends in a working state; nothing breaks the current install until
@@ -408,6 +469,40 @@ items.
   `citypaul` and keep only the personal dotfiles; (c) leave as is.
   Recommended: (b) if any of the shell/terminal config is used, otherwise (a).
 
+### Phase 6 — Codex
+
+Can start any time after Phase 1; it is independent of the cut-over.
+
+- Confirm which manifest Codex reads when it installs from a repository.
+  Matt's repository installs with `.claude-plugin/` plus per-skill
+  `agents/openai.yaml` and nothing Codex-specific, but verify this against
+  Codex's current docs. Add whatever is missing, and test
+  `codex plugin marketplace add conjurer-rich/skills` and
+  `codex plugin add craft@conjurer` on a clean machine.
+- Give every **portable** and **degrades** skill an `agents/openai.yaml`.
+  Many already have one, inherited from upstream.
+- Tag every shipped item with its D10 tier in `craft:ask` and the README.
+- Add a CI check that **portable** and **degrades** skills do not name
+  Claude Code tools (`Agent`, `Skill`, `Workflow`, `ToolSearch`,
+  `send_later`, `create_session`) or `~/.claude` paths outside a "Claude
+  Code:" note.
+- Port the two agents that portable skills lean on (`tdd-guardian`,
+  `refactor-scan`). Either express them as skills that any harness can run in
+  a subagent, or add Codex agent definitions (`.codex/agents/<name>.toml`)
+  next to the Claude ones. Choose one approach for both.
+- Turn the `/plan` and `/continue` commands into user-invoked skills
+  (`disable-model-invocation: true`) so they work in both harnesses.
+  `/delegate` stays Claude-only.
+- `scripts/install-global` (D5) already links `~/.codex/AGENTS.md`; check that
+  Codex picks it up.
+- Smoke test in Codex: `$ask` routes a bug report to `debugging`, `$tdd`
+  drives one red-green cycle, `$review` on a small branch produces both
+  sections, `$retro` runs. Record the results in the PR.
+
+Done when Codex installs craft from the marketplace on a clean machine, the
+portable skills appear and run, `craft:review` produces both axes, and
+`craft:ask` marks every claude-only item.
+
 ## Risks
 
 | Risk | Mitigation |
@@ -418,6 +513,8 @@ items.
 | Watch issues become noise | Silent when nothing changed; one issue per run; drop a source from `sources.json` when it stops being useful. |
 | `engineering-practice` is skipped on a coding task | The global `CLAUDE.md` / `AGENTS.md` tells every session to load it; Phase 2 checks it fires in a fresh session. |
 | A machine has the plugin but not the global file (cloud sessions) | The skill description still says "load first in any coding task"; for Claude Code on the web, add the same line to the environment's setup or the project's own `CLAUDE.md`. |
+| `review` is shadowed by a harness built-in (Claude Code once shipped `/review`; Codex has `/review`) | In Claude Code it is namespaced as `craft:review`, and in Codex it is called with `$review`, not `/review`. If either harness still shadows it, rename it to `two-axis-review`. |
+| A "portable" skill quietly picks up Claude-only wording | The Phase 6 CI check, and `$`-invocation smoke tests in Codex. |
 | Licensing drift when adopting from upstream | Keep the existing provenance pattern; the routine's issue template asks for the license check. |
 
 ## Appendix: triage proposal (Windows machine, 2026-10-08)
@@ -517,7 +614,7 @@ whether it ships in the plugin or sits on the shelf.
 | (none) | `retro` | **Adopt** as `craft:retro`, as above. |
 | (none) | `ask-matt` | **Adopt** as `craft:ask`, rewritten for craft's flows. |
 | (none) | `writing-for-agents` | **Adopt**: you are now the author of your skills, and it is the style guide for skills and `CLAUDE.md` / `AGENTS.md`. `retro` loads it. |
-| `panel-review` | `code-review` (two axes: standards and spec) | Shelve `panel-review`; do not adopt Matt's `code-review`, since its name collides with Claude Code's built-in. `acceptance-review` already covers the spec axis. |
+| `panel-review` | `code-review` (two axes: standards and spec) | Shelve `panel-review`. **Adapt** Matt's into `craft:review` (D9), which runs the same in Claude Code and Codex. It is not called `code-review`, because that name collides with Claude Code's built-in. |
 | `improve-codebase-architecture`, `codebase-design` | same names; ours are adaptations of `66898f60` | Keep ours; the watch routine flags Matt's changes. |
 | `debugging` | `diagnosing-bugs` | Keep ours (you use it); watch. |
 | `specification`, `story-splitting`, `planning` | `to-spec`, `to-tickets`, `wayfinder` | Keep ours: they feed `/delegate`. Note `wayfinder` for a greenfield or multi-week effort; shelf it if adopted. |
