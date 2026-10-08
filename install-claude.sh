@@ -38,7 +38,7 @@ INSTALL_OPENCODE=false
 INSTALL_EXTERNAL=true
 INSTALL_IMPECCABLE=true
 INSTALL_PONYTAIL=true
-BASE_URL="${DOTFILES_BASE_URL:-https://raw.githubusercontent.com/citypaul/.dotfiles}"
+BASE_URL="https://raw.githubusercontent.com/citypaul/.dotfiles"
 SKILLS_CLI_VERSION="1.5.22" # https://github.com/vercel-labs/skills/tree/v1.5.22
 
 # Reviewed immutable source revisions. Every source is pinned to a commit and
@@ -48,7 +48,7 @@ SKILLS_CLI_VERSION="1.5.22" # https://github.com/vercel-labs/skills/tree/v1.5.22
 # fetched locally with a shallow pinned `git fetch` and handed to the CLI as a
 # local path (see fetch_pinned_source). A subpath entry limits the fetch to
 # one directory for repos far larger than their skills.
-OWN_SKILLS_REPO_BASE="${DOTFILES_OWN_SKILLS_REPO:-citypaul/.dotfiles}"
+OWN_SKILLS_REPO_BASE="citypaul/.dotfiles"
 WEB_QUALITY_SKILLS_REPO="addyosmani/web-quality-skills#95d6e255afe1596b557d7a8498517884438f5b3a"
 CLARITY_SKILLS_REPO="addyosmani/clarity#9e3071196d5d26f26c58f5d7c995890b35a94499"
 SIMPLE_ENGLISH_SKILLS_REPO="AminBlg/SimpleEnglish#080a862b2e80d5fe19a2fbddd3de76f7d580279e"
@@ -75,8 +75,7 @@ ANTHROPIC_SKILLS_SUBPATH="skills"
 FIRST_PARTY_SKILLS=(
   acceptance-review api-design bff-design bff-entry-points
   characterisation-tests ci-debugging cli-design codebase-design debugging
-  diagrams domain-driven-design double-check engineering-practice
-  evaluate-existing-solutions
+  diagrams domain-driven-design double-check evaluate-existing-solutions
   event-sourcing expectations find-gaps find-skills finding-seams
   folder-structure front-end-testing functional graph-engineering
   hexagonal-architecture
@@ -88,16 +87,6 @@ FIRST_PARTY_SKILLS=(
   test-design-reviewer testing twelve-factor typescript-strict
   ubiquitous-language wtf xstate
 )
-
-# Additional first-party skill names contributed by a fork. Environment
-# variables cannot carry bash arrays, so the value is a space-separated string
-# split on read. Names join the reviewed manifest and are still subject to
-# validate_unique_skill_names.
-if [[ -n "${DOTFILES_EXTRA_SKILLS:-}" ]]; then
-  read -ra _extra_skills <<< "$DOTFILES_EXTRA_SKILLS"
-  FIRST_PARTY_SKILLS+=("${_extra_skills[@]}")
-fi
-
 WEB_QUALITY_SKILLS=(
   accessibility best-practices core-web-vitals performance seo web-quality-audit
 )
@@ -120,15 +109,13 @@ SEO_AUDIT_SKILLS=(seo-audit)
 ANTHROPIC_SKILLS=(skill-creator)
 HERDR_SKILLS=(herdr)
 WARP_COMMON_SKILLS=(skill-doctor)
-COMMAND_FILES=(setup.md plan.md continue.md delegate.md)
+COMMAND_FILES=(setup.md plan.md continue.md)
 AGENT_FILES=(
   tdd-guardian.md ts-enforcer.md refactor-scan.md docs-guardian.md adr.md
   learn.md use-case-data-patterns.md progress-guardian.md
   twelve-factor-audit.md
 )
-# Reference notes that document the agents. They live outside agents/ because
-# Claude Code loads every .md under agents/ (recursively) as an agent type.
-AGENT_NOTE_FILES=(README.md use-case-data-patterns-source-notes.md)
+CLAUDE_AGENT_FILES=("${AGENT_FILES[@]}" README.md)
 
 # Agents to target when installing skills via the pinned Skills CLI.
 # Built up from --agent/--with-opencode flags; default is claude-code only.
@@ -794,7 +781,7 @@ if [[ "$INSTALL_CLAUDE" == true ]]; then
   echo -e "${BLUE}Installing CLAUDE.md...${NC}"
   download_file \
     "$BASE_URL/$VERSION/claude/.claude/CLAUDE.md" \
-    "${DOTFILES_CLAUDE_MD_DEST:-$HOME/.claude/CLAUDE.md}" \
+    ~/.claude/CLAUDE.md \
     "CLAUDE.md"
   echo ""
 fi
@@ -885,18 +872,11 @@ fi
 if [[ "$INSTALL_AGENTS" == true ]]; then
   echo -e "${BLUE}Installing Claude Code agents...${NC}"
 
-  for agent in "${AGENT_FILES[@]}"; do
+  for agent in "${CLAUDE_AGENT_FILES[@]}"; do
     download_file \
       "$BASE_URL/$VERSION/claude/.claude/agents/$agent" \
       ~/.claude/agents/"$agent" \
       "agents/$agent"
-  done
-
-  for note in "${AGENT_NOTE_FILES[@]}"; do
-    download_file \
-      "$BASE_URL/$VERSION/claude/.claude/agent-notes/$note" \
-      ~/.claude/agent-notes/"$note" \
-      "agent-notes/$note"
   done
   echo ""
 fi
@@ -925,7 +905,7 @@ if [[ "$INSTALL_OPENCODE" == true ]]; then
       '/^allowed-tools:/d'
   done
 
-  # Project the agent files from the pinned source (notes live in agent-notes/).
+  # Project only real agent files (not README.md) from the pinned source.
   # OpenCode uses ~/.config/opencode/agent/ (singular) for agents
   # The 'tools' field expects an object in OpenCode but is a string in Claude Code
   # The 'color' field expects hex (#RRGGBB) in OpenCode but is a named color in Claude Code
@@ -981,12 +961,11 @@ if [[ "$INSTALL_PONYTAIL" == true ]]; then
 fi
 
 if [[ "$INSTALL_COMMANDS" == true ]]; then
-  echo -e "  ${GREEN}✓${NC} commands/ (4 slash commands: /setup, /plan, /continue, /delegate)"
+  echo -e "  ${GREEN}✓${NC} commands/ (3 slash commands: /setup, /plan, /continue)"
 fi
 
 if [[ "$INSTALL_AGENTS" == true ]]; then
-  echo -e "  ${GREEN}✓${NC} agents/ (9 Claude Code agents)"
-  echo -e "  ${GREEN}✓${NC} agent-notes/ (agent documentation, not loaded as agents)"
+  echo -e "  ${GREEN}✓${NC} agents/ (9 Claude Code agents + README)"
 fi
 
 if [[ "$INSTALL_OPENCODE" == true ]]; then
@@ -1027,7 +1006,7 @@ fi
 
 if [[ "$INSTALL_AGENTS" == true ]]; then
   echo -e "  Learn about agents:"
-  echo -e "     ${YELLOW}cat ~/.claude/agent-notes/README.md${NC}"
+  echo -e "     ${YELLOW}cat ~/.claude/agents/README.md${NC}"
   echo ""
 fi
 

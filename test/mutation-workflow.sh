@@ -154,7 +154,7 @@ require_text \
   "repository workflow: points mutation testing at PR readiness"
 
 require_text \
-  "$CLAUDE_ROOT/agent-notes/README.md" \
+  "$CLAUDE_ROOT/agents/README.md" \
   "At end-of-phase PR readiness" \
   "agent routing: defers mutation to PR readiness"
 

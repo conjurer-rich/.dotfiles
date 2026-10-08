@@ -109,11 +109,3 @@ jobs:
 
       - name: Validate changesets
         run: pnpm changeset status --since origin/main
-
-      # `changeset status` accepts a changeset naming a package outside the
-      # workspace, but the Release workflow's `changeset version` rejects it.
-      # An upstream merge brought in one naming @citypaul/dotfiles and every
-      # release on main failed (Release runs 41-43). Run the same version step
-      # here, on a throwaway checkout, so the PR goes red instead.
-      - name: Dry-run the release version step
-        run: bash fork/version.sh

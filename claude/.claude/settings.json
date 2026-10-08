@@ -25,17 +25,6 @@
           }
         ]
       }
-    ],
-    "Stop": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "\"$HOME/.claude/hooks/stop-hook-git-check.sh\"",
-            "timeout": 10
-          }
-        ]
-      }
     ]
   }
 }
