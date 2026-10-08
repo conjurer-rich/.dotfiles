@@ -1466,6 +1466,36 @@ Four slash commands that encode common workflows into single invocations:
 
 PR review is not a command: the [`panel-review` skill](claude/.claude/skills/panel-review/SKILL.md) provides `/panel-review`, and PR creation is ordinary agent-led work gated by that skill's PR-readiness reference.
 
+#### Unattended `/delegate` runs: permissions
+
+`/delegate` pre-approves its own tools, but a `/loop /delegate` session still stops at a permission prompt when a project's settings ask before `git worktree` commands, and nobody is there to answer. The delegator creates, lists, removes and prunes worktrees from the main checkout, so allow those four in the project's `.claude/settings.json`:
+
+```json
+{
+  "permissions": {
+    "allow": [
+      "Bash(git worktree list:*)",
+      "Bash(git worktree add:*)",
+      "Bash(git worktree remove:*)",
+      "Bash(git worktree prune:*)"
+    ]
+  }
+}
+```
+
+`git worktree remove` takes `--force` only for a merged worktree whose sole leftovers are agent scratch (`AGENTS.md`, untracked files under `.claude/`), which `delegate-status` checks first. The delegator also commits and pushes from the main checkout with `git -C <worktree> commit` and `git -C <worktree> push`; a project that narrows `Bash(git:*)` allows those two as well.
+
+Settings a project can add to `.claude/delegation.md` to keep delegated runs cheap, each optional:
+
+| Setting | Effect |
+|---|---|
+| `tier_small_max_lines`, `tier_small_max_packages`, `risk_paths` | A diff under the limits that touches no risk path is tier S: no plan document and one self-review instead of a review panel |
+| `full_suite_paths` | Paths whose change makes the implementer run the complete suite locally |
+| **Verification scope** section | Replaces the `/pr` gate's complete-suite rule with the project's own scope |
+| `preflight:` line | Drift fixers run before a PR's first push, in order |
+
+A project that sets none of them keeps the skill's defaults. Every delegated PR body ends with a `Delegation cost:` line, and `delegate-status cost --repo <owner>/<repo> --limit 10` sums it across recent merged delegated PRs.
+
 ### Recommended Flow
 
 This is the delivery lifecycle for a feature. Project setup is a separate,
