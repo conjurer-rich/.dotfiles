@@ -316,6 +316,9 @@ require_text 'write its first outcome branch to `ccr-outcome-branch`' "the outco
 require_text '| **Hand-off** step 3, once the next session starts | `[handed off → <id>] <title>` |' "a handed-off session says so in its title"
 require_text '| **Hand-off** ends the loop without a next session | `[loop ended] <title>` |' "an ended loop says so in its title"
 require_text 'the last 8 characters of the new session'"'"'s id' "the title names the session it handed off to"
+# The report named the new session only by id, so the human had to find it in
+# the sidebar; it now links to the session.
+require_text 'plus the new session as a clickable link, `[<id>](https://claude.ai/code/<session id>)`' "the hand-off report links to the new session"
 # G. Cloud container guidance.
 require_text '## Running in a cloud container' "the skill has cloud container guidance"
 require_text 'only the GitHub connector attached' "the guidance names the connector cost"
