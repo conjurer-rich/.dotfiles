@@ -87,6 +87,7 @@ skills/
   delivery/             # delegating-github-issues, planning, stack-pull-requests, panel-review, …
   writing/              # technical-writing, diagrams, expectations, wtf, …
   in-progress/          # drafts: in the repo, NOT listed in plugin.json
+  shelf/                # kept but not shipped; craft:ask can point at them
   deprecated/           # aliases kept for a release, then deleted
   REFERENCES.md
 agents/                 # the nine agents
@@ -129,12 +130,12 @@ skill files were written upstream; the fork owns
 `delegating-github-issues`, `browser-ux-walkthrough`, the `delegate` command,
 the stop hook and the `engineering-practice` additions.
 
-Triage every item into one of:
+Triage every item into one of (see the appendix for the result):
 
 | Bucket | Meaning |
 | --- | --- |
 | **Own** | Moves; from now on it is ours and evolves freely. |
-| **Drop** | Not used; does not move. The watch routine can still flag upstream changes to it if wanted. |
+| **Shelf** | Not used now; moves to `shelf/`, outside `plugin.json`. Promote it with a one-line change. |
 | **Replace** | Matt (or another source) has a better version; adopt that instead, with provenance. |
 
 Use evidence, not memory, for "in use": count `Skill` tool calls and
@@ -325,7 +326,9 @@ Carry over only skill-related checks, with paths rewritten from
   `skill-evals-quality.sh`, `skill-evals-routing.sh`;
 - new: plugin manifest ↔ directory check (D3), and a link check that every
   `craft:<name>` and relative path referenced from a skill, agent or command
-  resolves;
+  resolves to a shipped item. Only `craft:ask` may name a shelved one;
+- new: every shipped skill appears in `craft:ask`, so nothing ships that the
+  router cannot point you at;
 - `skill-evals.yml` (promptfoo, weekly + `run-evals` label), needing the
   `ANTHROPIC_API_KEY` secret in the new repository;
 - changeset validation + release dry-run.
@@ -358,7 +361,7 @@ Phase 4.
 
 Done when: `claude plugin marketplace add conjurer-rich/skills` and
 `claude plugin install craft@conjurer` in a clean home give the same
-`craft:` skills, agents, commands and Stop hook as today, minus **Drop**ped
+`craft:` skills, agents, commands and Stop hook as today, minus **Shelf**ed
 items.
 
 ### Phase 2 — fold `CLAUDE.md`
@@ -457,28 +460,72 @@ already supplies it, but it is where `CLAUDE.md` folds into (D5).
 | `double-check` | acceptance-review |
 | agent `refactor-scan` | tdd-guardian ×2 |
 
-### Your call: thin dependency
+### Unused is not the same as useless
 
-| Item | Leaned on by | Recommendation |
+The items below went unused in the last month, but some may simply never have
+come to mind at the right moment. Two changes address that, rather than
+deleting skills or keeping all of them loaded:
+
+1. **A `shelf/` bucket** (Matt's `misc/`, renamed). A shelved skill stays in
+   the repository but is not listed in `plugin.json`, so its description costs
+   no context in every session and does not compete for routing. Promoting it
+   back is a one-line `plugin.json` change. "Drop" now means only that a
+   skill moves to the shelf, not that it is deleted.
+2. **Make use visible.** Two new skills, both adapted from Matt:
+   - **`craft:ask`** (from `ask-matt`): a user-invoked router. You describe
+     the situation and it names the skill or flow, including shelved skills
+     ("there's a shelved `twelve-factor-audit` for this; promote it?"). It is
+     written as **flows** (idea → ship, plus on-ramps), not as a list of
+     skills, and it also serves as the README.
+   - **`craft:retro`** (from `retro`): run at the end of a session to suggest
+     changes to the environment (checks, standards, navigation pointers). The
+     adaptation adds one category: **missed skills**, where the session did by
+     hand something a craft skill or shelved skill covers. Over time this, and
+     re-running `scripts/skill-usage.py` each quarter, is what moves skills
+     between the plugin and the shelf.
+
+### When each dormant item earns its place
+
+The trigger for each item goes into `craft:ask`. The **Where** column says
+whether it ships in the plugin or sits on the shelf.
+
+| Item | Reach for it when… | Where |
 | --- | --- | --- |
-| `panel-review` (+ `graph-engineering`, which it is built on) | tdd ×2, planning, tdd-guardian | Drop both and repoint those lines at `/code-review` (26 uses) and the project `pr-reviewer` agent (19), which is what you actually use. |
-| `improve-codebase-architecture` | refactoring, reduce-system-complexity | Keep; it is already an adaptation of Matt's, so the watch routine tracks it. |
-| `xstate`, `react-performance` | react-testing | Keep if React work continues. |
-| `api-design`, `cli-design`, `diagrams` | technical-writing ×1 each | Keep `api-design`; drop the other two. |
-| agents `adr`, `learn` | planning | Drop; repoint planning at `expectations`. |
-| commands `/plan`, `/continue` | planning | Drop unless you type them. |
+| `twelve-factor-audit` (agent) | before a service's first production deploy, or when a deploy works in one environment and not another | plugin (pairs with `twelve-factor`, which you use) |
+| `production-parity-skill-builder` | the first time a bug shows up only in production; it builds a per-app parity skill once | shelf |
+| `find-skills` | the same kind of task has come up three times with no skill behind it, or `craft:retro` reports a missed skill that craft lacks | plugin (user-invoked) |
+| `double-check` | before merging something high-stakes (auth, payments, migrations) for an independent second opinion | plugin |
+| `diagrams` | a PR or doc explains a flow, a state machine or a boundary in more than a paragraph | plugin |
+| `api-design` | adding an endpoint another team or client consumes | plugin |
+| `bff-design` | deciding whether to add a backend-for-frontend, or splitting one | shelf (`bff-entry-points` stays: hexagonal and oauth lean on it) |
+| `cli-design` | building a CLI tool (it is 3,000 lines; heavy for a rare need) | shelf |
+| `xstate`, `react-performance` | a UI flow has more than three states, or a React screen feels slow | plugin while React work continues |
+| `render-code-shape` | you want a cited map of existing code's modules and types before changing it | shelf (`codebase-design` covers most of it) |
+| `improve-codebase-architecture` | a spare afternoon of upkeep; it finds the candidates | plugin |
+| `panel-review` + `graph-engineering` | a multi-lens review of a large change | shelf: you review with `/code-review` (26) and `pr-reviewer` (19) |
+| agents `adr`, `learn` | recording a hard-to-reverse decision or a lesson | plugin (they are what `grill-with-docs` should write through, below) |
+| commands `/plan`, `/continue` | starting a planned slice; resuming after a merged PR in a stack | plugin (cheap; `planning` points at them) |
+| `/setup`, agents `docs-guardian`, `progress-guardian`, `ts-enforcer`, `use-case-data-patterns`, `folder-structure` | — | shelf; `folder-structure` is deleted after one release |
 
-### Drop: nothing used depends on it
+### Where Matt's library has a better-formed version
 
-`folder-structure` (deprecated alias), `find-skills`, `teach-me`,
-`render-code-shape`, `production-parity-skill-builder`, `bff-design`, `wtf`,
-command `/setup`, agents `docs-guardian`, `progress-guardian`, `ts-enforcer`,
-`twelve-factor-audit`, `use-case-data-patterns`. References to them from kept
-items are removed during import; the D8 link check confirms none are left.
+| Ours | Matt's | Call |
+| --- | --- | --- |
+| `teach-me` (1,753 lines, many resources) | `teach` (140 lines): a stateful workspace with a mission, lessons, reference sheets and learning records that build up across sessions | **Replace** with an adaptation of `teach`. It is shorter and fits "learn this over weeks" better. |
+| `wtf` (70 lines, UK English) | `wait-what` (7 lines, uses the glossary's vocabulary) | Keep one: `wtf` with one line added to use `GLOSSARY.md` terms. |
+| (none, but you used `grill-me` 8 times and `superpowers:brainstorming` 11 times) | `grilling`, `grill-me`, `grill-with-docs` | **Adopt** all three. Adapt `grill-with-docs` to record terms through `ubiquitous-language` and decisions through `adr`, instead of Matt's `domain-modeling`, so there is one glossary system. This becomes step 1 of the main flow, ahead of `find-gaps`. |
+| (none) | `retro` | **Adopt** as `craft:retro`, as above. |
+| (none) | `ask-matt` | **Adopt** as `craft:ask`, rewritten for craft's flows. |
+| (none) | `writing-for-agents` | **Adopt**: you are now the author of your skills, and it is the style guide for skills and `CLAUDE.md` / `AGENTS.md`. `retro` loads it. |
+| `panel-review` | `code-review` (two axes: standards and spec) | Shelve `panel-review`; do not adopt Matt's `code-review`, since its name collides with Claude Code's built-in. `acceptance-review` already covers the spec axis. |
+| `improve-codebase-architecture`, `codebase-design` | same names; ours are adaptations of `66898f60` | Keep ours; the watch routine flags Matt's changes. |
+| `debugging` | `diagnosing-bugs` | Keep ours (you use it); watch. |
+| `specification`, `story-splitting`, `planning` | `to-spec`, `to-tickets`, `wayfinder` | Keep ours: they feed `/delegate`. Note `wayfinder` for a greenfield or multi-week effort; shelf it if adopted. |
+| (none) | `research`, `prototype`, `handoff` | Optional. `research` (background agent, cited Markdown file in the repo) is the most likely to help. |
 
 ### Used, but not part of craft: candidates to adopt or watch
 
-- `grill-me` (Matt) ×8: adopt into the plugin, with provenance.
+- `grill-me` (Matt) ×8: adopt, with `grilling` and `grill-with-docs` (above).
 - `superpowers:*` (brainstorming ×11, writing/executing plans, git worktrees,
   systematic debugging): overlaps `planning`, `specification` and `debugging`.
   Consider adding `obra/superpowers` to `upstream/sources.json`.
