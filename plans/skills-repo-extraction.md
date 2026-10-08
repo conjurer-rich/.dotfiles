@@ -1,8 +1,7 @@
 # Spec: move the craft skills into their own repository
 
-Status: proposal — nothing here is built yet. D1, D5 and D9–D11 are decided; D12 is proposed.
-Still open: the copyright holder name (D11, before Phase 1) and what
-`.dotfiles` becomes (Phase 5).
+Status: proposal — nothing here is built yet. D1, D5 and D9–D12 are decided. Still open:
+what `.dotfiles` becomes (Phase 5), which is not needed until the end.
 
 ## Why
 
@@ -420,8 +419,7 @@ subfolders.
 
 1. **Root `LICENSE`: MIT, with both notices.** It keeps
    `Copyright (c) 2024 Paul Hammond`, which MIT requires because most of
-   craft derives from his work, and adds `Copyright (c) 2026 Richard Allen`
-   **(confirm: your name, or Conjurer Solutions)**. It keeps the paragraph
+   craft derives from his work, and adds `Copyright (c) 2026 Richard Allen`. It keeps the paragraph
    that says nested `LICENSE` / `NOTICE` files govern their directories.
 2. **Nested notices move with their directory, byte for byte,** including
    into `shelf/`. Shelving a skill does not remove its licence obligations.
@@ -465,7 +463,7 @@ subfolders.
     "adopt" or "adapt" suggestion, and rule 3 is part of done for any PR that
     acts on one.
 
-### D12. Delegation without lock-in: a Ralph runner beside `/loop` (proposed)
+### D12. Delegation without lock-in: a Ralph runner beside `/loop` (decided)
 
 **How `/loop /delegate` works today.** `/loop` is built into Claude Code, and
 it keeps running passes **in the same session and context window**. The
@@ -560,7 +558,7 @@ Phase 4.
 ### Phase 0 — decide (this PR)
 
 - ~~Answer the repository-name and `CLAUDE.md` decisions~~ — done (D1, D5).
-- Confirm the copyright holder for your share of the root `LICENSE` (D11).
+- ~~Confirm the copyright holder for the root `LICENSE`~~ — Richard Allen (D11).
 - Run the usage count (D4) locally and fill in the triage table:
   `scripts/skill-usage.py` in this repository (see below).
 
