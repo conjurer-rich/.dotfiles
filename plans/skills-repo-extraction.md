@@ -86,10 +86,11 @@ skills/
   delivery/             # delegating-github-issues, planning, stack-pull-requests, review, …
   writing/              # technical-writing, diagrams, expectations, wtf, …
   in-progress/          # drafts: in the repo, NOT listed in plugin.json
-  shelf/                # kept but not shipped; craft:ask can point at them
   deprecated/           # aliases kept for a release, then deleted
   REFERENCES.md
-agents/                 # the nine agents
+agents/                 # shipped agents
+shelf/                  # skills/, agents/, commands/ kept but not shipped;
+                        # craft:ask can point at them
 commands/               # continue, delegate, plan, setup
 hooks/
   hooks.json            # Stop → stop-hook-git-check.sh (ships with the plugin)
