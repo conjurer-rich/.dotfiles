@@ -298,6 +298,10 @@ require_text 'call `ScheduleWakeup` with `stop: true`' "the stopped session ends
 require_text 'unsubscribe every PR in `subscribed.json`' "the stopped session stops taking PR events"
 require_text 'Do not archive this session' "the stopped session keeps its staged worktree"
 require_text 'A stop on isolation-guard refusals never hands off' "a guard-refusal stop ends the loop"
+# Only a /loop run handed off, so a /delegate #<n> that hit the context or
+# tool-call limit stopped and waited for the human to start a new session.
+require_text 'It then follows **Hand-off**, under `/loop` or not' "every stopped run hands off, not only a loop"
+require_text 'or, for a run started by hand, the exact `/delegate` command with its arguments' "a hand-started run's successor runs the same command"
 # A ScheduleWakeup timer lives in the container, which is reclaimed while the
 # session idles, so the loop stalled for hours until a PR event or the human
 # woke it. On the web the next pass is a server-side send_later reminder.
