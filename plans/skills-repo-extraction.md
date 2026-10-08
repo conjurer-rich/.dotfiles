@@ -1,8 +1,8 @@
 # Spec: move the craft skills into their own repository
 
-Status: proposal — nothing here is built yet. D1 (repository name) and D5
-(`CLAUDE.md`) are decided. The one item still marked **(decide)** (what
-`.dotfiles` becomes, Phase 5) is not needed until the end.
+Status: proposal — nothing here is built yet. D1, D5 and D9–D11 are decided.
+Still open: the copyright holder name (D11, before Phase 1) and what
+`.dotfiles` becomes (Phase 5).
 
 ## Why
 
@@ -397,6 +397,74 @@ Rules for every skill written or adapted from Phase 1 on:
 - **The tier is declared in `craft:ask`**, so the router never sends you to a
   claude-only skill in Codex.
 
+### D11. Licences and acknowledgements (decided)
+
+Everything in craft comes from somewhere. The move keeps every notice the
+licences require, and makes the credit visible rather than buried in
+subfolders.
+
+**What craft carries today** (audited at `.dotfiles` `HEAD`):
+
+| Material | Licence | Copyright / authors | Where the notice lives |
+| --- | --- | --- | --- |
+| Most skills, agents and commands, and `CLAUDE.md` | MIT | Paul Hammond (2024) | root `LICENSE` |
+| `acceptance-review`, `reduce-system-complexity`, `render-code-shape`, `technical-writing`, `wtf` | MIT | Adam Bulmer (2025), `mintuz/skills` | each skill's `LICENSE` + `source-notes.md` (pinned commit) |
+| `codebase-design`, `improve-codebase-architecture` | MIT | Matt Pocock (2026), `mattpocock/skills@66898f60` | each skill's `LICENSE` + `source-notes.md` |
+| `api-design` | MIT | Addy Osmani (2025) | `LICENSE` + `source-notes.md` |
+| `find-skills` | MIT | Vercel, Inc. (2026) | `LICENSE` + `source-notes.md` |
+| `cli-design` | **CC BY-SA 4.0** | Aanand Prasad, Ben Firshman, Carl Tashian, Eva Parish, *Command Line Interface Guidelines* | `LICENSE` + `source-notes.md`. Root `LICENSE` says nested notices take precedence |
+| `diagrams` | MIT (original rewrite) | — | `NOTICE`: earlier versions held unlicensed text from `markdown-viewer/skills`; the current tree is a rewrite |
+| Ideas and methods cited (Fowler, Evans, Feathers, Ousterhout, Cockburn, Ottinger, …) | not copied text, so no licence applies | — | `skills/REFERENCES.md` and per-skill `source-notes.md` |
+
+**Rules in the new repository**
+
+1. **Root `LICENSE`: MIT, with both notices.** It keeps
+   `Copyright (c) 2024 Paul Hammond`, which MIT requires because most of
+   craft derives from his work, and adds `Copyright (c) 2026 Richard Allen`
+   **(confirm: your name, or Conjurer Solutions)**. It keeps the paragraph
+   that says nested `LICENSE` / `NOTICE` files govern their directories.
+2. **Nested notices move with their directory, byte for byte,** including
+   into `shelf/`. Shelving a skill does not remove its licence obligations.
+3. **Every adopted or adapted skill gets its own `LICENSE`** (the upstream
+   text verbatim, with the upstream copyright line) and
+   `references/source-notes.md`. The notes give the pinned commit URL, what
+   was taken, and what was changed, with a dated "Modified by …" line. MIT
+   does not require the change note, but CC BY-SA and Apache 2.0 do, and one
+   habit for all three is simpler. This covers every Matt skill in the
+   triage: `grilling`, `grill-me`, `grill-with-docs`, `teach`, `retro`,
+   `ask`, `writing-for-agents` and `review`.
+4. **Share-alike stays separate.** `cli-design` and anything derived from it
+   stay CC BY-SA 4.0. Its text is never pasted into an MIT skill. A skill may
+   link to it.
+5. **Apache 2.0 needs its `NOTICE` too.** craft has none today. Adopting one
+   (Anthropic's skills, `impeccable`) means carrying `LICENSE`, the upstream
+   `NOTICE`, and a change notice in each modified file.
+6. **No licence, no text.** A source without a clear licence can inform a
+   skill as an idea with a citation, but its wording is not copied. The
+   `diagrams` notice is the reason for this rule. The fresh import (D2) means
+   the new repository's history never contains that material.
+7. **One place to see the credits: `ACKNOWLEDGEMENTS.md`** at the root, also
+   linked from the README and `craft:ask`:
+   - a **licensed sources** table: item, upstream, licence, copyright, pinned
+     commit, path to the local notice;
+   - **people and projects**: Paul Hammond for the original framework and
+     most of the skills; Matt Pocock, Adam Bulmer, Addy Osmani, Vercel and the
+     CLI Guidelines authors; Paul Bakaus is not listed, since none of
+     `impeccable` is in craft;
+   - **ideas**: a pointer to `skills/REFERENCES.md`, which moves unchanged.
+8. **`plugin.json`** keeps `"license": "SEE LICENSE IN LICENSE"`, because
+   the plugin mixes MIT and CC BY-SA. `author` becomes you, and `homepage`
+   points at `ACKNOWLEDGEMENTS.md`.
+9. **CI keeps it true** (D8):
+   - every directory with a `LICENSE` or `NOTICE` has a row in
+     `ACKNOWLEDGEMENTS.md`, and every row's path exists;
+   - every `source-notes.md` that names an upstream repository has a
+     `LICENSE` beside it, or says "ideas only, no text copied";
+   - the root `LICENSE` still contains Paul Hammond's notice.
+10. **The upstream watch issue** (D6) carries a licence line for each
+    "adopt" or "adapt" suggestion, and rule 3 is part of done for any PR that
+    acts on one.
+
 ## Plan
 
 Each phase ends in a working state; nothing breaks the current install until
@@ -405,19 +473,23 @@ Phase 4.
 ### Phase 0 — decide (this PR)
 
 - ~~Answer the repository-name and `CLAUDE.md` decisions~~ — done (D1, D5).
+- Confirm the copyright holder for your share of the root `LICENSE` (D11).
 - Run the usage count (D4) locally and fill in the triage table:
   `scripts/skill-usage.py` in this repository (see below).
 
 ### Phase 1 — create the repository and import
 
-- Create `conjurer-rich/skills` (private or public), MIT `LICENSE` naming both
-  Paul Hammond (2024, for the adopted material) and you, plus `PROVENANCE.md`
-  with the source `.dotfiles` SHA and the triage table.
+- Create `conjurer-rich/skills` (private or public), with the root `LICENSE`,
+  `ACKNOWLEDGEMENTS.md` and `PROVENANCE.md` (source `.dotfiles` SHA and the
+  triage table) as D11 describes.
 - Copy **Own** items into the D3 layout; `deprecated/` aliases as noted.
 - Write `marketplace.json`, `plugin.json` (explicit skill list, `5.0.0`),
   `hooks/hooks.json`.
 - Rewrite `claude/.claude/…` paths in skills, agents, commands and tests (13
   skill/agent/command files and ~30 test references today).
+- Licensing pass (D11): nested notices copied verbatim; `LICENSE` and
+  `source-notes.md` for each newly adopted Matt skill; the acknowledgements
+  check added to CI.
 - Port the tests and evals (D8); CI green.
 
 Done when: `claude plugin marketplace add conjurer-rich/skills` and
@@ -513,6 +585,7 @@ portable skills appear and run, `craft:review` produces both axes, and
 | Watch issues become noise | Silent when nothing changed; one issue per run; drop a source from `sources.json` when it stops being useful. |
 | `engineering-practice` is skipped on a coding task | The global `CLAUDE.md` / `AGENTS.md` tells every session to load it; Phase 2 checks it fires in a fresh session. |
 | A machine has the plugin but not the global file (cloud sessions) | The skill description still says "load first in any coding task"; for Claude Code on the web, add the same line to the environment's setup or the project's own `CLAUDE.md`. |
+| A licence notice is lost in the move or on a later adoption | D11's CI checks; nested notices are copied, never rewritten. |
 | `review` is shadowed by a harness built-in (Claude Code once shipped `/review`; Codex has `/review`) | In Claude Code it is namespaced as `craft:review`, and in Codex it is called with `$review`, not `/review`. If either harness still shadows it, rename it to `two-axis-review`. |
 | A "portable" skill quietly picks up Claude-only wording | The Phase 6 CI check, and `$`-invocation smoke tests in Codex. |
 | Licensing drift when adopting from upstream | Keep the existing provenance pattern; the routine's issue template asks for the license check. |
