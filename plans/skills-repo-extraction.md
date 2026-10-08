@@ -1,7 +1,8 @@
 # Spec: move the craft skills into their own repository
 
-Status: proposal — nothing here is built yet. Decisions marked **(decide)** need
-an answer before Phase 1 starts; everything else has a recommended default.
+Status: proposal — nothing here is built yet. D1 (repository name) and D5
+(`CLAUDE.md`) are decided. The one item still marked **(decide)** (what
+`.dotfiles` becomes, Phase 5) is not needed until the end.
 
 ## Why
 
@@ -51,7 +52,7 @@ A new repository, owned outright, that:
 
 | Thing | Today | Proposed |
 | --- | --- | --- |
-| Repository | `conjurer-rich/.dotfiles` | `conjurer-rich/skills` **(decide name)** |
+| Repository | `conjurer-rich/.dotfiles` | `conjurer-rich/skills` (decided) |
 | Marketplace name | `conjurer-dotfiles` | `conjurer` |
 | Plugin name | `craft` | `craft` (unchanged) |
 | Install id | `craft@conjurer-dotfiles` | `craft@conjurer` |
@@ -150,18 +151,33 @@ Known starting points:
   pairs in `upstream/skill-map.json`; whether to **Replace** any of them is a
   later, per-skill decision, not part of the move.
 
-### D5. `CLAUDE.md` and the base/overlay split
+### D5. `CLAUDE.md` folds into `engineering-practice` (decided)
 
-Today `~/.claude/CLAUDE.md` is the fork overlay, which `@`-imports Paul's file
-installed verbatim as `~/.claude/base-CLAUDE.md`. Decoupling means that import
-goes.
+Today `~/.claude/CLAUDE.md` is the fork overlay (`CLAUDE.rich.md`), which
+`@`-imports Paul's file installed verbatim as `~/.claude/base-CLAUDE.md`, and
+`engineering-practice` only points at a copy of that base at
+`${CLAUDE_PLUGIN_ROOT}/CLAUDE.md`. Decoupling means the import, the overlay and
+the pointer all go.
 
-Recommended: fold the parts of `CLAUDE.md` and `CLAUDE.rich.md` that are
-engineering policy into `engineering-practice` (where plugin users already
-get them), and reduce `~/.claude/CLAUDE.md` to a short personal file — personal
-preferences plus "load `craft:engineering-practice` before coding". That file is
-a dotfile, not plugin content. **(decide: keep a global `CLAUDE.md` at all, and
-where it lives.)**
+`engineering-practice` becomes the single source of truth for the guidelines:
+
+- `SKILL.md` holds the core policy from `CLAUDE.md` (philosophy, testing,
+  TypeScript, code style, workflow, output guardrails), edited down to what is
+  still wanted. No `CLAUDE.md` ships at the new repository's root except the
+  one that guides work *on* the repository.
+- `references/routing.md` holds the skill-routing table, merged from both
+  files: `CLAUDE.md`'s Quick Reference and `CLAUDE.rich.md`'s "Skill Routing".
+  Lines for skills that are dropped or not installed (for example `pre-commit`,
+  `quality`, `scaffold-new-project`) are removed, and the CI link check (D8)
+  keeps it honest.
+- `CLAUDE.rich.md`'s "Global preferences" (visual companion consent, skills
+  live globally) move into `SKILL.md` as their own short section.
+- The skill description keeps "load this first in any coding task", since
+  that description is now the only thing that triggers it.
+
+The installer no longer writes `~/.claude/CLAUDE.md` or `base-CLAUDE.md`. Any
+existing copies are deleted at cut-over (Phase 4), so the guidelines are not
+loaded twice from two diverging sources.
 
 ### D6. Upstream watch: a weekly Claude Code Routine that files one issue
 
@@ -253,7 +269,7 @@ Phase 4.
 
 ### Phase 0 — decide (this PR)
 
-- Answer the **(decide)** items: repository name, global `CLAUDE.md`.
+- ~~Answer the repository-name and `CLAUDE.md` decisions~~ — done (D1, D5).
 - Run the usage count (D4) locally and fill in the triage table.
 
 ### Phase 1 — create the repository and import
@@ -275,9 +291,14 @@ items.
 
 ### Phase 2 — fold `CLAUDE.md`
 
-- Move the wanted policy from `CLAUDE.md` / `CLAUDE.rich.md` into
-  `engineering-practice`; prune routing lines for dropped skills.
-- Write the slim personal `~/.claude/CLAUDE.md` wherever D5 decides.
+- Rewrite `engineering-practice` as D5 describes: policy in `SKILL.md`,
+  merged routing table in `references/routing.md`, global preferences as
+  their own section; drop the `${CLAUDE_PLUGIN_ROOT}/CLAUDE.md` pointer.
+- Prune routing lines for dropped or uninstalled skills; the link check
+  passes.
+- Check in a fresh session that a coding prompt loads
+  `craft:engineering-practice` without being asked (and a promptfoo routing
+  case for it, if cheap).
 
 ### Phase 3 — upstream watch
 
@@ -294,6 +315,8 @@ items.
   that uses it.
 - Update any `extraKnownMarketplaces` / `enabledPlugins` settings that name
   `conjurer-dotfiles`.
+- Delete `~/.claude/CLAUDE.md` and `~/.claude/base-CLAUDE.md` (back them up
+  first) so only `engineering-practice` supplies the guidelines.
 
 ### Phase 5 — retire the fork's plugin
 
@@ -313,4 +336,5 @@ items.
 | Stop hook behaves differently as a plugin hook (`$HOME/.claude/hooks/…` path) | Use `${CLAUDE_PLUGIN_ROOT}` in `hooks.json`; keep the delegator-exemption test. |
 | Two plugins installed at once during cut-over → duplicate skills | Uninstall the old one before installing the new one (Phase 4 order). |
 | Watch issues become noise | Silent when nothing changed; one issue per run; drop a source from `sources.json` when it stops being useful. |
+| With no global `CLAUDE.md`, `engineering-practice` is skipped on a coding task | Its description says "load first in any coding task"; Phase 2 checks it fires. If it doesn't, add a one-line `~/.claude/CLAUDE.md` that names the skill. |
 | Licensing drift when adopting from upstream | Keep the existing provenance pattern; the routine's issue template asks for the license check. |
