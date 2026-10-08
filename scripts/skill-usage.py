@@ -53,21 +53,21 @@ def inventory(plugin_root):
     skills = plugin_root / "skills"
     for d in sorted(p for p in skills.iterdir() if (p / "SKILL.md").is_file()):
         text = "\n".join(
-            f.read_text(errors="replace")
+            f.read_text(encoding="utf-8", errors="replace")
             for f in sorted(d.rglob("*"))
             if f.is_file() and f.suffix in {".md", ".yaml", ".yml", ""}
         )
         items.append({"kind": "skill", "name": d.name, "text": text})
     for kind, folder in (("agent", "agents"), ("command", "commands")):
         for f in sorted((plugin_root / folder).glob("*.md")):
-            items.append({"kind": kind, "name": f.stem, "text": f.read_text(errors="replace")})
+            items.append({"kind": kind, "name": f.stem, "text": f.read_text(encoding="utf-8", errors="replace")})
     return items
 
 
 def guidance_texts(plugin_root):
     """Top-level guidance files that route to skills but are not items."""
     return {
-        f.name: f.read_text(errors="replace")
+        f.name: f.read_text(encoding="utf-8", errors="replace")
         for f in sorted(plugin_root.glob("CLAUDE*.md"))
     }
 
@@ -132,7 +132,7 @@ def scan(project_dirs, since):
             continue
         for path in sorted(root.rglob("*.jsonl")):
             files += 1
-            with path.open(errors="replace") as handle:
+            with path.open(encoding="utf-8", errors="replace") as handle:
                 for raw in handle:
                     try:
                         line = json.loads(raw)
